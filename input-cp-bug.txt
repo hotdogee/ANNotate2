@@ -1,0 +1,53 @@
+2018-09-29 18:32:25,566 Gru256x4 8086K2-1.2[8163] INFO accuracy: 96.08270%, loss:  0.12394, lr:  0.06500, step: 353,523 (168.930 sec)
+2018-09-29 18:34:29,903 Gru256x4 8086K2-1.2[8163] INFO Saving step checkpoints for 353664 into /data2r1/checkpoints/pfam-regions-d0-s20/v4-BiRnn/Gru256x4_lr0.065_step278323_2080Ti_8086K2-1.2/step.
+2018-09-29 18:34:32,478 Gru256x4 8086K2-1.2[8163] INFO Saving epoch checkpoints for 353664 into /data2r1/checkpoints/pfam-regions-d0-s20/v4-BiRnn/Gru256x4_lr0.065_step278323_2080Ti_8086K2-1.2/epoch.
+2018-09-29 18:34:35,288 Gru256x4 8086K2-1.2[8163] INFO Calling model_fn.
+2018-09-29 18:34:36,035 Gru256x4 8086K2-1.2[8163] INFO Applying exp learning rate warmup for 15000 steps
+2018-09-29 18:34:36,560 Gru256x4 8086K2-1.2[8163] INFO Create EpochCheckpointInputPipelineHook.
+2018-09-29 18:34:36,560 Gru256x4 8086K2-1.2[8163] INFO Create EpochCheckpointSaverHook.
+2018-09-29 18:34:36,560 Gru256x4 8086K2-1.2[8163] INFO Done calling model_fn.
+2018-09-29 18:34:36,574 Gru256x4 8086K2-1.2[8163] INFO Starting evaluation at 2018-09-29-10:34:36
+2018-09-29 18:34:36,940 Gru256x4 8086K2-1.2[8163] INFO Graph was finalized.
+Epoch 0: 100%|███████████████████████████████████████████████████████████████████████████████▉| 43374609/43375025 [17:50:32<00:00, 675.28seq/s]2018-09-29 18:34:36.941165: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1484] Adding visible gpu devices: 0
+2018-09-29 18:34:36.941197: I tensorflow/core/common_runtime/gpu/gpu_device.cc:965] Device interconnect StreamExecutor with strength 1 edge matrix:
+2018-09-29 18:34:36.941204: I tensorflow/core/common_runtime/gpu/gpu_device.cc:971]      0
+2018-09-29 18:34:36.941211: I tensorflow/core/common_runtime/gpu/gpu_device.cc:984] 0:   N
+2018-09-29 18:34:36.941302: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1097] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 10172 MB memory) -> physical GPU (device: 0, name: GeForce RTX 2080 Ti, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2018-09-29 18:34:36,942 Gru256x4 8086K2-1.2[8163] INFO Restoring parameters from /data2r1/checkpoints/pfam-regions-d0-s20/v4-BiRnn/Gru256x4_lr0.065_step278323_2080Ti_8086K2-1.2/step-353664
+2018-09-29 18:34:38,295 Gru256x4 8086K2-1.2[8163] INFO Running local_init_op.
+2018-09-29 18:34:38,313 Gru256x4 8086K2-1.2[8163] INFO Done running local_init_op.
+2018-09-29 18:34:41,306 Gru256x4 8086K2-1.2[8163] INFO Evaluation [10/100]
+2018-09-29 18:34:43,647 Gru256x4 8086K2-1.2[8163] INFO Evaluation [20/100]
+2018-09-29 18:34:45,888 Gru256x4 8086K2-1.2[8163] INFO Evaluation [30/100]
+2018-09-29 18:34:48,300 Gru256x4 8086K2-1.2[8163] INFO Evaluation [40/100]
+2018-09-29 18:34:50,897 Gru256x4 8086K2-1.2[8163] INFO Evaluation [50/100]
+2018-09-29 18:34:53,241 Gru256x4 8086K2-1.2[8163] INFO Evaluation [60/100]
+2018-09-29 18:34:55,573 Gru256x4 8086K2-1.2[8163] INFO Evaluation [70/100]
+2018-09-29 18:34:57,856 Gru256x4 8086K2-1.2[8163] INFO Evaluation [80/100]
+2018-09-29 18:35:00,508 Gru256x4 8086K2-1.2[8163] INFO Evaluation [90/100]
+2018-09-29 18:35:02,784 Gru256x4 8086K2-1.2[8163] INFO Evaluation [100/100]
+2018-09-29 18:35:02,826 Gru256x4 8086K2-1.2[8163] INFO Finished evaluation at 2018-09-29-10:35:02
+2018-09-29 18:35:02,827 Gru256x4 8086K2-1.2[8163] INFO Saving dict for global step 353664: accuracy = 0.9257847, global_step = 353664, loss = 0.2455332
+2018-09-29 18:35:03,119 Gru256x4 8086K2-1.2[8163] INFO Saving 'checkpoint_path' summary for global step 353664: /data2r1/checkpoints/pfam-regions-d0-s20/v4-BiRnn/Gru256x4_lr0.065_step278323_2080Ti_8086K2-1.2/step-353664
+Epoch 0: 100%|███████████████████████████████████████████████████████████████████████████████▉| 43374609/43375025 [17:50:58<00:00, 675.00seq/s]
+2018-09-29 18:35:03,301 Gru256x4 8086K2-1.2[8163] DEBUG Removed input checkpoints
+2018-09-29 18:35:03,302 Gru256x4 8086K2-1.2[8163] INFO Loss for final step: 0.21694542.
+2018-09-29 18:35:03,302 Gru256x4 8086K2-1.2[8163] INFO Running training and evaluation locally (non-distributed).
+2018-09-29 18:35:03,302 Gru256x4 8086K2-1.2[8163] INFO Start train and evaluate loop. The evaluate will happen after every checkpoint. Checkpoint frequency is determined based on RunConfig arguments: save_checkpoints_steps None or save_checkpoints_secs 3600.
+2018-09-29 18:35:03,424 Gru256x4 8086K2-1.2[8163] INFO Calling model_fn.
+2018-09-29 18:35:04,145 Gru256x4 8086K2-1.2[8163] INFO Applying exp learning rate warmup for 15000 steps
+2018-09-29 18:35:04,918 Gru256x4 8086K2-1.2[8163] INFO Create EpochCheckpointInputPipelineHook.
+2018-09-29 18:35:04,918 Gru256x4 8086K2-1.2[8163] INFO Create EpochCheckpointSaverHook.
+2018-09-29 18:35:04,918 Gru256x4 8086K2-1.2[8163] INFO Done calling model_fn.
+2018-09-29 18:35:05,438 Gru256x4 8086K2-1.2[8163] INFO Graph was finalized.
+2018-09-29 18:35:05.438952: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1484] Adding visible gpu devices: 0
+2018-09-29 18:35:05.438982: I tensorflow/core/common_runtime/gpu/gpu_device.cc:965] Device interconnect StreamExecutor with strength 1 edge matrix:
+2018-09-29 18:35:05.438987: I tensorflow/core/common_runtime/gpu/gpu_device.cc:971]      0
+2018-09-29 18:35:05.438991: I tensorflow/core/common_runtime/gpu/gpu_device.cc:984] 0:   N
+2018-09-29 18:35:05.439072: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1097] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 10172 MB memory) -> physical GPU (device: 0, name: GeForce RTX 2080 Ti, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2018-09-29 18:35:05,441 Gru256x4 8086K2-1.2[8163] INFO Restoring parameters from /data2r1/checkpoints/pfam-regions-d0-s20/v4-BiRnn/Gru256x4_lr0.065_step278323_2080Ti_8086K2-1.2/step-353664
+2018-09-29 18:35:05,817 Gru256x4 8086K2-1.2[8163] INFO Running local_init_op.
+2018-09-29 18:35:05,836 Gru256x4 8086K2-1.2[8163] INFO Done running local_init_op.
+2018-09-29 18:35:09,030 Gru256x4 8086K2-1.2[8163] INFO accuracy: 95.16342%, loss:  0.16758, lr:  0.06500, step: 353,664
+2018-09-29 18:36:52,150 Gru256x4 8086K2-1.2[8163] INFO global_step/sec: 1.93949
+2018-09-29 18:36:52,150 Gru256x4 8086K2-1.2[8163] INFO accuracy: 93.16654%, loss:  0.19534, lr:  0.06500, step: 353,864 (103.120 sec)
