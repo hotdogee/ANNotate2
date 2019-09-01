@@ -7,5 +7,7 @@
         "--style",
         "pep8"
     ],
-    "python.pythonPath": "C:\\Program Files\\Python37\\python.exe"
+    "python.pythonPath": "C:\\Users\\Hotdogee\\venv\\tf37\\Scripts\\python.exe",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
 }

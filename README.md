@@ -7,7 +7,13 @@
 
    * https://www.tensorflow.org/install/gpu
 
-2. Install Python 3.6
+2. Install Python 3.7
+
+   * (Optional) Setup python virtual environment
+     ```ps
+     py -3.7 -m venv $Env:USERPROFILE\venv\tf37
+     & "$Env:USERPROFILE\venv\tf37\Scripts\Activate.ps1"
+     ```
 
 3. Install Python libraries
 
@@ -82,7 +88,7 @@ optional arguments:
   ```python datasets/pfam_regions_build.py -t 2 -e 2 -d ~/datasets```
 
 * Build a toy dataset that can finish in 40 steps (20 sec) - 1 sequence/class - 4000 classes
-  
+
   ```python datasets/pfam_regions_build.py -n 4000 -t 1 -e 1 -d ~/datasets```
 
 

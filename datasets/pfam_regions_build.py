@@ -15,10 +15,10 @@ from collections import defaultdict
 import numpy as np
 import tensorflow as tf
 
-def _gzip_size(filename):
+def _gzip_size(path):
     """Uncompressed size is stored in the last 4 bytes of the gzip file
     """
-    with open(filename, 'rb') as f:
+    with open(path, 'rb') as f:
         f.seek(-4, 2)
         return struct.unpack('I', f.read(4))[0]
 

@@ -3,7 +3,9 @@ import re
 import time
 import gzip
 import errno
+import struct
 import argparse
+from tqdm import tqdm
 from glob import glob
 from pathlib import Path
 from collections import defaultdict
@@ -11,9 +13,7 @@ from collections import namedtuple
 from collections import OrderedDict
 
 # windows
-# python .\util\uniprot\compare_sprot_trembl.py --tsv1 D:/uniprot/uniprot-20190211/uniprot_sprot.dat.gz --tsv2 D:/uniprot/uniprot-20190211/uniprot_trembl.dat.gz
-# ubuntu
-# python compare_pfam_regions_tsv.py --tsv1 --tsv2
+# python .\util\pfam\compare_pfam_regions_tsv.py --tsv1 D:/pfam/Pfam31.0/Pfam-A.regions.uniprot.tsv.gz --tsv2 D:/pfam/Pfam32.0/Pfam-A.regions.uniprot.tsv.gz
 
 # uniprot_acc seq_version crc64            md5                              pfamA_acc seq_start seq_end
 # A0A103YDS2  1           3C510D74FCA8479C 31e3d17a0f6766e2a545214e475d72a8 PF04863   52        107
@@ -26,84 +26,55 @@ from collections import OrderedDict
 # W5N889      1           509B93CB8368603C 0e92ab8939197d40e00e0238de6b8a69 PF09014   264       351
 # A0A0D9V4Z5  1           25C8FDA89273F894 1ddc7bbbfec83e195473a9e51b763b16 PF04863   552       607
 
+# set stats:
+# * UA: uniprot_acc
+# * UA_SV: uniprot_acc + seq_version
+# * PA: pfamA_acc
+# * UA_SV_PA: uniprot_acc + seq_version + pfamA_acc
+# * UA_SV_PA_SE: uniprot_acc + seq_version + pfamA_acc + seq_start + seq_end
 
-FT_KEYS = ['TRANSMEM', 'DNA_BIND', 'REPEAT', 'REGION', 'COMPBIAS', 'INTRAMEM', 'DOMAIN', 'CA_BIND', 'COILED', 'ZN_FING', 'NP_BIND', 'MOTIF', 'TOPO_DOM', 'HELIX', 'STRAND', 'TURN', 'ACT_SITE', 'METAL', 'BINDING', 'SITE', 'NON_STD', 'MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK', 'VAR_SEQ', 'VARIANT', 'MUTAGEN', 'CONFLICT', 'UNSURE', 'NON_CONS', 'NON_TER', 'INIT_MET', 'SIGNAL', 'TRANSIT', 'PROPEP', 'CHAIN', 'PEPTIDE']
+# /Pfam31.0 88M
+# $ wc -l Pfam-A.regions.uniprot.tsv
+# 88761543 Pfam-A.regions.uniprot.tsv
+# /Pfam32.0 138M
+# $ wc -l Pfam-A.regions.uniprot.tsv
+# 138165284 Pfam-A.regions.uniprot.tsv
 
-FT = namedtuple('FT', ['key', 'start', 'end'])
+def _gzip_size(path):
+    """Uncompressed size is stored in the last 4 bytes of the gzip file
+    """
+    with open(path, 'rb') as f:
+        f.seek(-4, 2)
+        return struct.unpack('I', f.read(4))[0]
 
-def stats_uniprot_dat(path):
+def stats_pfam_regions_tsv(path):
     path = Path(path)
     # if gzipped
+    target = os.path.getsize(path)
     if path.suffix == '.gz':
         f = gzip.open(path, mode='rt', encoding='utf-8')
+        target = _gzip_size(path)
+        while target < os.path.getsize(path):
+            # the uncompressed size can't be smaller than the compressed size, so add 4GB
+            target += 2**32
     else:
         f = path.open(mode='r', encoding='utf-8')
     # initialize
-    overlap = dict([(k, dict([(k, 0) for k in FT_KEYS])) for k in FT_KEYS])
     vocab = defaultdict(set)
-    count = defaultdict(int)
-    id = ''
-    mp_e = 0 # Molecule processing
-    ptm_e = 0 # PTM
-    sf_e = 0 # Structure feathers
-    entry = defaultdict(list)
-    with f:
+    line_num = 0
+    with f, tqdm(total=target, unit='bytes', dynamic_ncols=True, ascii=True) as t:
         for line in f:
+            t.update(len(line))
+            line_num += 1
+            if line_num == 1: continue # skip header
             # line code
-            lc = line[:2]
-
-            # empty line
-            line = line.strip()
-            if line.strip() == '':
-                continue
-
-            # termination
-            if lc == '//':
-                count[lc] += 1
-                # check overlapping features
-                for i in range(len(entry['FT'])):
-                    for j in range(i+1, len(entry['FT'])):
-                        f1 = entry['FT'][i]
-                        f2 = entry['FT'][j]
-                        if f2.start <= f1.end and f2.end >= f1.start:
-                            overlap[f1.key][f2.key] = 1
-                            overlap[f2.key][f1.key] = 1
-                # clear entry
-                entry = defaultdict(list)
-            elif lc == 'ID':
-                count[lc] += 1
-                id = line.split()[1]
-                vocab[lc].add(id)
-            elif lc == 'AC':
-                for ac in [a.strip() for a in line[5:].split(';') if a != '']:
-                    vocab[lc].add(ac)
-            elif lc == 'OX':
-                count[lc] += 1
-            elif lc == 'PE':
-                count[lc] += 1
-            elif lc == 'SQ':
-                count[lc] += 1
-            elif lc == 'FT':
-                vocab['FTID'].add(id)
-                key = line[5:13].strip()
-                start = line[14:20].strip()
-                end = line[21:27].strip()
-                if key == '' or start == '' or end == '':
-                    continue
-                if start[0] in ['>', '<', '?']:
-                    start = start[1:]
-                if end[0] in ['>', '<', '?']:
-                    end = end[1:]
-                if start == '' or end == '':
-                    continue
-                start = int(start)
-                end = int(end)
-                entry['FT'].append(FT(key, start, end))
-                # if count[key] < 2:
-                #     print(f'FT {key} - {id}')
-                vocab[lc].add(key)
-                count[key] += 1
-    return vocab, count, overlap
+            tokens = line.strip().split()
+            vocab['UA'].add(f'{tokens[0]}')
+            vocab['UA_SV'].add(f'{tokens[0]}.{tokens[1]}')
+            vocab['PA'].add(f'{tokens[4]}')
+            vocab['UA_SV_PA'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}')
+            vocab['UA_SV_PA_SE'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}.{tokens[5]}.{tokens[6]}')
+    return vocab, line_num
 
 def verify_input_path(p):
     # get absolute path to dataset directory
@@ -140,33 +111,61 @@ if __name__ == "__main__":
     tsv2_path = verify_input_path(args.tsv2)
     print(f'Comparing: {tsv1_path.name} and {tsv2_path.name}')
 
-    sprot_vocab, sprot_count, sprot_overlap = stats_uniprot_dat(sprot_path)
-    trembl_vocab, trembl_count, trembl_overlap = stats_uniprot_dat(trembl_path)
+    tsv1_vocab, tsv1_line_num = stats_pfam_regions_tsv(tsv1_path)
+    print(f'Processed {tsv1_line_num} lines in {tsv1_path.name}')
+    tsv2_vocab, tsv2_line_num = stats_pfam_regions_tsv(tsv2_path)
+    print(f'Processed {tsv2_line_num} lines in {tsv2_path.name}')
 
-    print('==ID set stats==')
-    print_set_stats('sprot', sprot_vocab['ID'], 'trembl', trembl_vocab['ID'])
+    for sid in tsv1_vocab.keys():
+        print(f'== {sid} set stats ==')
+        print_set_stats('Pfam31', tsv1_vocab[sid], 'Pfam32', tsv2_vocab[sid])
 
-    print('==AC set stats==')
-    print_set_stats('sprot', sprot_vocab['AC'], 'trembl', trembl_vocab['AC'])
+    print(f'Runtime: {time.time() - start_time:.2f} s\n')
 
-    print(f'Run time: {time.time() - start_time:.2f} s\n')
+# Processed 138165284 lines in Pfam-A.regions.uniprot.tsv.gz
+# ==UA set stats==
 
-# Comparing: uniprot_sprot.dat.gz and uniprot_trembl.dat.gz==ID set stats==
+# Pfam31: 54223493
+# Pfam32: 88966235
+# Pfam31 & Pfam32: 50546302
+# Pfam31 | Pfam32: 92643426
+# Pfam31 - Pfam32: 3677191
+# Pfam32 - Pfam31: 38419933
 
-# sprot: 559077
-# trembl: 139694261
-# sprot & trembl: 0
-# sprot | trembl: 140253338
-# sprot - trembl: 559077
-# trembl - sprot: 139694261
+# ==UA_SV set stats==
 
-# ==AC set stats==
+# Pfam31: 54223493
+# Pfam32: 88966235
+# Pfam31 & Pfam32: 50430906
+# Pfam31 | Pfam32: 92758822
+# Pfam31 - Pfam32: 3792587
+# Pfam32 - Pfam31: 38535329
 
-# sprot: 774874
-# trembl: 140179159
-# sprot & trembl: 0
-# sprot | trembl: 140954033
-# sprot - trembl: 774874
-# trembl - sprot: 140179159
+# ==PA set stats==
 
-# Run time: 10610.75 s
+# Pfam31: 16712
+# Pfam32: 17929
+# Pfam31 & Pfam32: 16700
+# Pfam31 | Pfam32: 17941
+# Pfam31 - Pfam32: 12
+# Pfam32 - Pfam31: 1229
+
+# ==UA_SV_PA set stats==
+
+# Pfam31: 80971626
+# Pfam32: 125800935
+# Pfam31 & Pfam32: 69832952
+# Pfam31 | Pfam32: 136939609
+# Pfam31 - Pfam32: 11138674
+# Pfam32 - Pfam31: 55967983
+
+# ==UA_SV_PA_SE set stats==
+
+# Pfam31: 88761542
+# Pfam32: 138165283
+# Pfam31 & Pfam32: 73271292
+# Pfam31 | Pfam32: 153655533
+# Pfam31 - Pfam32: 15490250
+# Pfam32 - Pfam31: 64893991
+
+# Runtime: 1724.41 s (1950X)
