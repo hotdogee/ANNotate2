@@ -13,7 +13,7 @@ from collections import namedtuple
 from collections import OrderedDict
 
 # windows
-# python .\util\pfam\compare_pfam_regions_tsv.py --tsv1 D:/pfam/Pfam31.0/Pfam-A.regions.uniprot.tsv.gz --tsv2 D:/pfam/Pfam32.0/Pfam-A.regions.uniprot.tsv.gz
+# python .\util\pfam\compare_pfam_regions_tsv_2.py --tsv1 D:/pfam/Pfam31.0/Pfam-A.regions.uniprot.tsv.gz --tsv2 D:/pfam/Pfam32.0/Pfam-A.regions.uniprot.tsv.gz
 
 # uniprot_acc seq_version crc64            md5                              pfamA_acc seq_start seq_end
 # A0A103YDS2  1           3C510D74FCA8479C 31e3d17a0f6766e2a545214e475d72a8 PF04863   52        107
@@ -69,11 +69,11 @@ def stats_pfam_regions_tsv(path):
             if line_num == 1: continue # skip header
             # line code
             tokens = line.strip().split()
-            vocab['UA'].add(f'{tokens[0]}')
+            # vocab['UA'].add(f'{tokens[0]}')
             vocab['UA_SV'].add(f'{tokens[0]}.{tokens[1]}')
             vocab['PA'].add(f'{tokens[4]}')
-            vocab['UA_SV_PA'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}')
-            vocab['UA_SV_PA_SE'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}.{tokens[5]}.{tokens[6]}')
+            # vocab['UA_SV_PA'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}')
+            vocab['UA_SV_PA_SE'].add((f'{tokens[0]}.{tokens[1]}',f'{tokens[4]}',f'{tokens[5]}.{tokens[6]}'))
     return vocab, line_num
 
 def verify_input_path(p):
@@ -99,7 +99,7 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Print the differences of two Pfam-A.regions.uniprot.tsv.gz files.')
+        description='Obtain new regions of old domains on old sequences.')
     parser.add_argument('-1', '--tsv1', type=str, required=True,
         help="Path to the first Pfam-A.regions.uniprot.tsv.gz file, required.")
     parser.add_argument('-2', '--tsv2', type=str, required=True,
@@ -116,9 +116,23 @@ if __name__ == "__main__":
     tsv2_vocab, tsv2_line_num = stats_pfam_regions_tsv(tsv2_path)
     print(f'Processed {tsv2_line_num} lines in {tsv2_path.name}')
 
-    for sid in tsv1_vocab.keys():
-        print(f'== {sid} set stats ==')
-        print_set_stats('Pfam31', tsv1_vocab[sid], 'Pfam32', tsv2_vocab[sid])
+    # Obtain new regions of old domains on old sequences
+    # Obtain new regions of old domains on new sequences
+    # UA_SV_PA_SE(Pfam32 - Pfam31), PA(Pfam31), UA_SV(Pfam31)
+    new_regions = tsv2_vocab['UA_SV_PA_SE'] - tsv1_vocab['UA_SV_PA_SE']
+    in_old = set()
+    in_new = set()
+    for r in new_regions:
+        if r[0] in tsv1_vocab['UA_SV'] and r[1] in tsv1_vocab['PA']:
+            in_old.add(r)
+            if len(in_old) <= 10:
+                print(r)
+        elif r[0] in tsv2_vocab['UA_SV'] and r[1] in tsv1_vocab['PA']:
+            in_new.add(r)
+    print(f'''
+in_old: {len(in_old)}
+in_new: {len(in_new)}
+''')
 
     print(f'Runtime: {time.time() - start_time:.2f} s\n')
 
@@ -169,3 +183,26 @@ if __name__ == "__main__":
 # Pfam32 - Pfam31: 64893991
 
 # Runtime: 1724.41 s (1950X)
+
+# Obtain new regions of old domains on old sequences
+# Obtain new regions of old domains on new sequences
+# UA_SV_PA_SE(Pfam32 - Pfam31), PA(Pfam31), UA_SV(Pfam31)
+
+# Comparing: Pfam-A.regions.uniprot.tsv.gz and Pfam-A.regions.uniprot.tsv.gz
+# Processed 88761543 lines in Pfam-A.regions.uniprot.tsv.gz
+# Processed 138165284 lines in Pfam-A.regions.uniprot.tsv.gz
+# ('A0A091QBG2.1', 'PF13676', '5.133')
+# ('A0A0B2BLQ5.1', 'PF13673', '44.142')
+# ('A5W749.1', 'PF13953', '757.823')
+# ('A0A139CAZ0.1', 'PF00353', '412.427')
+# ('D7BSF4.1', 'PF13519', '83.192')
+# ('A0A0X7K9U4.1', 'PF13561', '8.197')
+# ('A0A0G0G1F4.1', 'PF01195', '3.178')
+# ('A0A024V2M9.1', 'PF05011', '428.531')
+# ('K7AHY7.1', 'PF12806', '468.601')
+# ('A0A0W0J687.1', 'PF00353', '299.328')
+
+# in_old: 3937943
+# in_new: 58323242
+
+# Runtime: 1514.82 s
