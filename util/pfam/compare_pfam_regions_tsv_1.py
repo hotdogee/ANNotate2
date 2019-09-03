@@ -40,12 +40,14 @@ from collections import OrderedDict
 # $ wc -l Pfam-A.regions.uniprot.tsv
 # 138165284 Pfam-A.regions.uniprot.tsv
 
+
 def _gzip_size(path):
     """Uncompressed size is stored in the last 4 bytes of the gzip file
     """
     with open(path, 'rb') as f:
         f.seek(-4, 2)
         return struct.unpack('I', f.read(4))[0]
+
 
 def stats_pfam_regions_tsv(path):
     path = Path(path)
@@ -62,19 +64,25 @@ def stats_pfam_regions_tsv(path):
     # initialize
     vocab = defaultdict(set)
     line_num = 0
-    with f, tqdm(total=target, unit='bytes', dynamic_ncols=True, ascii=True) as t:
+    with f, tqdm(
+        total=target, unit='bytes', dynamic_ncols=True, ascii=True
+    ) as t:
         for line in f:
             t.update(len(line))
             line_num += 1
-            if line_num == 1: continue # skip header
+            if line_num == 1:
+                continue  # skip header
             # line code
             tokens = line.strip().split()
             vocab['UA'].add(f'{tokens[0]}')
             vocab['UA_SV'].add(f'{tokens[0]}.{tokens[1]}')
             vocab['PA'].add(f'{tokens[4]}')
             vocab['UA_SV_PA'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}')
-            vocab['UA_SV_PA_SE'].add(f'{tokens[0]}.{tokens[1]}.{tokens[4]}.{tokens[5]}.{tokens[6]}')
+            vocab['UA_SV_PA_SE'].add(
+                f'{tokens[0]}.{tokens[1]}.{tokens[4]}.{tokens[5]}.{tokens[6]}'
+            )
     return vocab, line_num
+
 
 def verify_input_path(p):
     # get absolute path to dataset directory
@@ -87,23 +95,39 @@ def verify_input_path(p):
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
     return path
 
+
 def print_set_stats(n1, s1, n2, s2, unit=''):
-    print(f'''
+    print(
+        f'''
 {n1}: {len(s1)} {unit}
 {n2}: {len(s2)} {unit}
 {n1} & {n2}: {len(s1 & s2)} {unit}
 {n1} | {n2}: {len(s1 | s2)} {unit}
 {n1} - {n2}: {len(s1 - s2)} {unit}
 {n2} - {n1}: {len(s2 - s1)} {unit}
-''')
+'''
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Print the differences of two Pfam-A.regions.uniprot.tsv.gz files.')
-    parser.add_argument('-1', '--tsv1', type=str, required=True,
-        help="Path to the first Pfam-A.regions.uniprot.tsv.gz file, required.")
-    parser.add_argument('-2', '--tsv2', type=str, required=True,
-        help="Path to the second Pfam-A.regions.uniprot.tsv.gz file, required.")
+        description=
+        'Print the differences of two Pfam-A.regions.uniprot.tsv.gz files.'
+    )
+    parser.add_argument(
+        '-1',
+        '--tsv1',
+        type=str,
+        required=True,
+        help="Path to the first Pfam-A.regions.uniprot.tsv.gz file, required."
+    )
+    parser.add_argument(
+        '-2',
+        '--tsv2',
+        type=str,
+        required=True,
+        help="Path to the second Pfam-A.regions.uniprot.tsv.gz file, required."
+    )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 

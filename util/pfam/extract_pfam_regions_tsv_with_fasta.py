@@ -99,6 +99,9 @@ def verify_output_path(p):
 
 # python .\util\pfam\extract_pfam_regions_tsv_with_fasta.py  --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz
 
+# fix last seq bug
+# python .\util\pfam\extract_pfam_regions_tsv_with_fasta.py  --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Extract pfam regions for sequences in a FASTA file.'
@@ -198,9 +201,9 @@ if __name__ == "__main__":
 # Regions: 123
 # Runtime: 0.56 s
 
-# 2019-09-04 00:23:56 INFO     Extracting pfam regions from Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv with fasta file Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.n100.fa.gz into Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz
-# 100%|#################################################################7| 48428/48628 [00:00<00:00, 24253343.77bytes/s]
-# 2019-09-04 00:23:56 INFO     Parsed 99 seqs from Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.n100.fa.gz
-#  99%|#######################################################2| 4629155666/4688421289 [02:13<00:01, 34758584.66bytes/s]
-# Regions: 161
-# Runtime: 133.21 s
+# 2019-09-04 04:04:09 INFO     Extracting pfam regions from Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv with fasta file Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz into Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz
+# 100%|#################################################################7| 48619/48819 [00:00<00:00, 48634120.24bytes/s]
+# 2019-09-04 04:04:09 INFO     Parsed 100 seqs from Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz
+#  99%|#######################################################2| 4629155666/4688421289 [02:08<00:01, 36165204.81bytes/s]
+# Regions: 170
+# Runtime: 128.04 s

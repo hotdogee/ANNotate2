@@ -111,6 +111,11 @@ def verify_output_path(p):
 
 # fix last seq bug
 # python .\util\pfam\extract_evaluation_data.py --tsv31 D:/pfam/Pfam31.0/Pfam-A.regions.uniprot.tsv.gz --tsv32 D:/pfam/Pfam32.0/Pfam-A.regions.uniprot.tsv.gz --fa32 D:/pfam/Pfam32.0/uniprot.gz --oldfa D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_2.fa.gz --oldtsv D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_2.all_regions.tsv.gz --oldadd D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_2.p32_regions.tsv.gz --newfa D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa.gz --newtsv D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.tsv.gz
+# p31_seqs_with_p32_regions_of_p31_domains_2.fa.gz
+# No change
+# p32_seqs_with_p32_regions_of_p31_domains_2.fa.gz
+# >Z9K8E8.1 Z9K8E8_9GAMM Uncharacterized protein {ECO:0000313|EMBL:EWS99547.1} (Fragment)
+# GAVFYALVRTFADLVSDNRDEVIAKHFKLIHRLLFWLDWLPARITSFGYLVIGNFNKGTSCWLHYVFDFSSPNHKVVTYTALAAEQVEERYYGCTFESLLV
 
 # ubuntu 18.04
 # $ cd Downloads
@@ -131,18 +136,18 @@ def verify_output_path(p):
 # copy files over
 # $ hmmpress Pfam-A.hmm
 # $ export PERL5LIB=/opt/PfamScan:$PERL5LIB
-# /opt/PfamScan/pfam_scan.pl -fasta p31_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p31_seqs_with_p32_regions_of_p31_domains.p31result.tsv
+# /opt/PfamScan/pfam_scan.pl -fasta p31_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv
 # memory: 4GB
 # runtime: 12:52:58 (W2125)
 # runtime: 15:01:15 (2920X)
 # runtime: 19:25:00 (1950X)
 
-# /usr/bin/time -v -o p32_seqs_with_p32_regions_of_p31_domains.p31result.tsv.time /opt/PfamScan/pfam_scan.pl -fasta p32_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p32_seqs_with_p32_regions_of_p31_domains.p31result.tsv
+# /usr/bin/time -v -o p32_seqs_with_p32_regions_of_p31_domains.p31_results.tsv.time /opt/PfamScan/pfam_scan.pl -fasta p32_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p32_seqs_with_p32_regions_of_p31_domains.p31_results.tsv
 # memory: 81.4GB
 # runtime:  (W2125)
 # runtime: OOM (2920X)
 # runtime: OOM (1950X)
-# /usr/bin/time -v -o test.p31result.tsv.time /opt/PfamScan/pfam_scan.pl -fasta test.fa -dir ./ -outfile ./test.p31result.tsv
+# /usr/bin/time -v -o test.p31_results.tsv.time /opt/PfamScan/pfam_scan.pl -fasta test.fa -dir ./ -outfile ./test.p31_results.tsv
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

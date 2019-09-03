@@ -103,6 +103,9 @@ def verify_output_path(p):
 # python .\util\pfam\sample_fasta.py --input D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --num 100 --seed 42
 # python .\util\pfam\sample_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --num 100 --seed 42
 
+# fix last seq bug
+# python .\util\pfam\sample_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --num 100 --seed 42
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Sample N sequences from a FASTA file.'
