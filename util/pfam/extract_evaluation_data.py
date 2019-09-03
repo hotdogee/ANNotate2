@@ -12,12 +12,14 @@ from collections import defaultdict
 from collections import namedtuple
 from collections import OrderedDict
 
+
 def _gzip_size(path):
     """Uncompressed size is stored in the last 4 bytes of the gzip file
     """
     with open(path, 'rb') as f:
         f.seek(-4, 2)
         return struct.unpack('I', f.read(4))[0]
+
 
 def stats_pfam_regions_tsv(path):
     path = Path(path)
@@ -34,19 +36,23 @@ def stats_pfam_regions_tsv(path):
     # initialize
     vocab = defaultdict(set)
     line_num = 0
-    with f, tqdm(total=target, unit='bytes', dynamic_ncols=True, ascii=True) as t:
+    with f, tqdm(
+        total=target, unit='bytes', dynamic_ncols=True, ascii=True
+    ) as t:
         for line in f:
             t.update(len(line))
             line_num += 1
-            if line_num == 1: continue # skip header
+            if line_num == 1:
+                continue  # skip header
             # line code
             tokens = line.strip().split()
             # vocab['UA'].add(f'{tokens[0]}')
             vocab['UA_SV'].add(f'{tokens[0]}.{tokens[1]}')
             vocab['PA'].add(f'{tokens[4]}')
-            vocab['UA_SV_PA'].add((f'{tokens[0]}.{tokens[1]}',f'{tokens[4]}'))
+            vocab['UA_SV_PA'].add((f'{tokens[0]}.{tokens[1]}', f'{tokens[4]}'))
             # vocab['UA_SV_PA_SE'].add((f'{tokens[0]}.{tokens[1]}',f'{tokens[4]}',f'{tokens[5]}.{tokens[6]}'))
     return vocab, line_num
+
 
 def verify_input_path(p):
     # get absolute path to dataset directory
@@ -59,6 +65,7 @@ def verify_input_path(p):
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
     return path
 
+
 def verify_output_path(p):
     # get absolute path to dataset directory
     path = Path(os.path.abspath(os.path.expanduser(p)))
@@ -69,18 +76,9 @@ def verify_output_path(p):
     if path.is_dir():
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
     # assert dirs
-    path.parent.mkdir(parents=True, exist_ok=True) # pylint: disable=no-member
+    path.parent.mkdir(parents=True, exist_ok=True)  # pylint: disable=no-member
     return path
 
-def print_set_stats(n1, s1, n2, s2, unit=''):
-    print(f'''
-{n1}: {len(s1)} {unit}
-{n2}: {len(s2)} {unit}
-{n1} & {n2}: {len(s1 & s2)} {unit}
-{n1} | {n2}: {len(s1 | s2)} {unit}
-{n1} - {n2}: {len(s1 - s2)} {unit}
-{n2} - {n1}: {len(s2 - s1)} {unit}
-''')
 
 # uniprot_acc seq_version crc64            md5                              pfamA_acc seq_start seq_end
 # A0A103YDS2  1           3C510D74FCA8479C 31e3d17a0f6766e2a545214e475d72a8 PF04863   52        107
@@ -108,7 +106,11 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
 # 138165284 Pfam-A.regions.uniprot.tsv
 
 # windows
+# initial run
 # python .\util\pfam\extract_evaluation_data.py --tsv31 D:/pfam/Pfam31.0/Pfam-A.regions.uniprot.tsv.gz --tsv32 D:/pfam/Pfam32.0/Pfam-A.regions.uniprot.tsv.gz --fa32 D:/pfam/Pfam32.0/uniprot.gz --oldfa D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --oldtsv D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv.gz --oldadd D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv.gz --newfa D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.fa.gz --newtsv D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv.gz
+
+# fix last seq bug
+# python .\util\pfam\extract_evaluation_data.py --tsv31 D:/pfam/Pfam31.0/Pfam-A.regions.uniprot.tsv.gz --tsv32 D:/pfam/Pfam32.0/Pfam-A.regions.uniprot.tsv.gz --fa32 D:/pfam/Pfam32.0/uniprot.gz --oldfa D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_2.fa.gz --oldtsv D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_2.all_regions.tsv.gz --oldadd D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_2.p32_regions.tsv.gz --newfa D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa.gz --newtsv D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.tsv.gz
 
 # ubuntu 18.04
 # $ cd Downloads
@@ -130,41 +132,103 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
 # $ hmmpress Pfam-A.hmm
 # $ export PERL5LIB=/opt/PfamScan:$PERL5LIB
 # /opt/PfamScan/pfam_scan.pl -fasta p31_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p31_seqs_with_p32_regions_of_p31_domains.p31result.tsv
-# /opt/PfamScan/pfam_scan.pl -fasta p32_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p32_seqs_with_p32_regions_of_p31_domains.p31result.tsv
+# memory: 4GB
+# runtime: 12:52:58 (W2125)
+# runtime: 15:01:15 (2920X)
+# runtime: 19:25:00 (1950X)
+
+# /usr/bin/time -v -o p32_seqs_with_p32_regions_of_p31_domains.p31result.tsv.time /opt/PfamScan/pfam_scan.pl -fasta p32_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p32_seqs_with_p32_regions_of_p31_domains.p31result.tsv
+# memory: 81.4GB
+# runtime:  (W2125)
+# runtime: OOM (2920X)
+# runtime: OOM (1950X)
 # /usr/bin/time -v -o test.p31result.tsv.time /opt/PfamScan/pfam_scan.pl -fasta test.fa -dir ./ -outfile ./test.p31result.tsv
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Output old and new data tsv and fa files.')
-    parser.add_argument('-31', '--tsv31', type=str, required=True,
-        help="Path to the Pfam31.0/Pfam-A.regions.uniprot.tsv.gz file, required.")
-    parser.add_argument('-32', '--tsv32', type=str, required=True,
-        help="Path to the Pfam32.0/Pfam-A.regions.uniprot.tsv.gz file, required.")
-    parser.add_argument('-f', '--fa32', type=str, required=True,
-        help="Path to the Pfam32.0/uniprot.gz file, required.")
-    parser.add_argument('-of', '--oldfa', type=str, required=True,
-        help="Path to output old.fa.gz, required.")
-    parser.add_argument('-ot', '--oldtsv', type=str, required=True,
-        help="Path to output old.tsv.gz, required.")
-    parser.add_argument('-oa', '--oldadd', type=str, required=True,
-        help="Path to output old_addition_only.tsv.gz, required.")
-    parser.add_argument('-nf', '--newfa', type=str, required=True,
-        help="Path to output new.fa.gz, required.")
-    parser.add_argument('-nt', '--newtsv', type=str, required=True,
-        help="Path to output new.tsv.gz, required.")
+        description='Output old and new data tsv and fa files.'
+    )
+    parser.add_argument(
+        '-31',
+        '--tsv31',
+        type=str,
+        required=True,
+        help="Path to the Pfam31.0/Pfam-A.regions.uniprot.tsv.gz file, required."
+    )
+    parser.add_argument(
+        '-32',
+        '--tsv32',
+        type=str,
+        required=True,
+        help="Path to the Pfam32.0/Pfam-A.regions.uniprot.tsv.gz file, required."
+    )
+    parser.add_argument(
+        '-f',
+        '--fa32',
+        type=str,
+        required=True,
+        help="Path to the Pfam32.0/uniprot.gz file, required."
+    )
+    parser.add_argument(
+        '-of',
+        '--oldfa',
+        type=str,
+        required=True,
+        help="Path to output old.fa.gz, required."
+    )
+    parser.add_argument(
+        '-ot',
+        '--oldtsv',
+        type=str,
+        required=True,
+        help="Path to output old.tsv.gz, required."
+    )
+    parser.add_argument(
+        '-oa',
+        '--oldadd',
+        type=str,
+        required=True,
+        help="Path to output old_addition_only.tsv.gz, required."
+    )
+    parser.add_argument(
+        '-nf',
+        '--newfa',
+        type=str,
+        required=True,
+        help="Path to output new.fa.gz, required."
+    )
+    parser.add_argument(
+        '-nt',
+        '--newtsv',
+        type=str,
+        required=True,
+        help="Path to output new.tsv.gz, required."
+    )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
     tsv31_path = verify_input_path(args.tsv31)
     tsv32_path = verify_input_path(args.tsv32)
     fa32_path = verify_input_path(args.fa32)
-    print(f"Comparing: {'/'.join(tsv31_path.parts[-2:])} and {'/'.join(tsv32_path.parts[-2:])}")
+    print(
+        f"Comparing: {'/'.join(tsv31_path.parts[-2:])} and {'/'.join(tsv32_path.parts[-2:])}"
+    )
 
-    oldfa_path = verify_output_path(args.oldfa) # p31_seqs_with_p32_regions_of_p31_domains.fa
-    oldtsv_path = verify_output_path(args.oldtsv) # p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv
-    oldadd_path = verify_output_path(args.oldadd) # p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv
-    newfa_path = verify_output_path(args.newfa) # p32_seqs_with_p32_regions_of_p31_domains.fa
-    newtsv_path = verify_output_path(args.newtsv) # p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv
+    oldfa_path = verify_output_path(
+        args.oldfa
+    )  # p31_seqs_with_p32_regions_of_p31_domains.fa
+    oldtsv_path = verify_output_path(
+        args.oldtsv
+    )  # p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv
+    oldadd_path = verify_output_path(
+        args.oldadd
+    )  # p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv
+    newfa_path = verify_output_path(
+        args.newfa
+    )  # p32_seqs_with_p32_regions_of_p31_domains.fa
+    newtsv_path = verify_output_path(
+        args.newtsv
+    )  # p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv
 
     tsv31_vocab, tsv31_line_num = stats_pfam_regions_tsv(tsv31_path)
     print(f'Processed {tsv31_line_num} lines in {tsv31_path.name}')
@@ -180,6 +244,7 @@ if __name__ == "__main__":
     # new.fa
     # new.tsv
     new_regions = tsv32_vocab['UA_SV_PA'] - tsv31_vocab['UA_SV_PA']
+    # free memory
     del tsv31_vocab['UA_SV_PA']
     del tsv32_vocab['UA_SV_PA']
     in_old = defaultdict(set)
@@ -191,15 +256,18 @@ if __name__ == "__main__":
         elif r[0] in tsv32_vocab['UA_SV'] and r[1] in tsv31_vocab['PA']:
             # in_new['UA_SV_PA'].add(r)
             in_new['UA_SV'].add(r[0])
+    # free memory
     del tsv31_vocab['UA_SV']
     del tsv32_vocab['UA_SV']
     del tsv31_vocab['PA']
     del tsv32_vocab['PA']
-    print(f'''
+    print(
+        f'''
 in_old['UA_SV_PA']: {len(in_old['UA_SV_PA'])}
 in_old['UA_SV']: {len(in_old['UA_SV'])}
 in_new['UA_SV']: {len(in_new['UA_SV'])}
-''')
+'''
+    )
 
     # write tsv
     write_tsv = False
@@ -214,14 +282,16 @@ in_new['UA_SV']: {len(in_new['UA_SV'])}
             target += 2**32
         # initialize
         line_num = 0
-        with tsv32_f, oldtsv_f, oldadd_f, newtsv_f, tqdm(total=target, unit='bytes', dynamic_ncols=True, ascii=True) as t:
+        with tsv32_f, oldtsv_f, oldadd_f, newtsv_f, tqdm(
+            total=target, unit='bytes', dynamic_ncols=True, ascii=True
+        ) as t:
             for line in tsv32_f:
                 # if target < tsv32_f.tell(): # OSError: telling position disabled by next() call
                 #     target += 2**32
                 #     t.total = target
                 t.update(len(line))
                 line_num += 1
-                if line_num == 1: # header
+                if line_num == 1:  # header
                     oldtsv_f.write(line)
                     oldadd_f.write(line)
                     newtsv_f.write(line)
@@ -229,7 +299,7 @@ in_new['UA_SV']: {len(in_new['UA_SV'])}
                 # parse
                 tokens = line.strip().split()
                 ua_sv = f'{tokens[0]}.{tokens[1]}'
-                if (ua_sv,f'{tokens[4]}') in in_old['UA_SV_PA']:
+                if (ua_sv, f'{tokens[4]}') in in_old['UA_SV_PA']:
                     oldadd_f.write(line)
                 if ua_sv in in_old['UA_SV']:
                     oldtsv_f.write(line)
@@ -247,7 +317,9 @@ in_new['UA_SV']: {len(in_new['UA_SV'])}
     # initialize
     seq_id, seq_entry = '', ''
     line_num = 0
-    with fa32_f, oldfa_f, newfa_f, tqdm(total=target, unit='bytes', dynamic_ncols=True, ascii=True) as t:
+    with fa32_f, oldfa_f, newfa_f, tqdm(
+        total=target, unit='bytes', dynamic_ncols=True, ascii=True
+    ) as t:
         for line in fa32_f:
             # if target < fa32_f.tell():
             #     target += 2**32
@@ -265,6 +337,11 @@ in_new['UA_SV']: {len(in_new['UA_SV'])}
                 # parse header
                 seq_id = line_s.split()[0][1:]
             seq_entry += line
+        if seq_entry:  # handle last seq
+            if seq_id in in_old['UA_SV']:
+                oldfa_f.write(seq_entry)
+            if seq_id in in_new['UA_SV']:
+                newfa_f.write(seq_entry)
 
     print(f'Runtime: {time.time() - start_time:.2f} s\n')
 
@@ -279,3 +356,8 @@ in_new['UA_SV']: {len(in_new['UA_SV'])}
 # 10643100349bytes [16:10, 10971842.48bytes/s]
 # 49586165246bytes [28:55, 28575875.42bytes/s]
 # Runtime: 4332.06 s (1950X)
+
+# <seq id> <alignment start> <alignment end> <envelope start> <envelope end> <hmm acc> <hmm name> <type> <hmm start> <hmm end> <hmm length> <bit score> <E-value> <significance> <clan>
+
+# A0A009EWY8.1     27     73     27     73 PF00440.22  TetR_N            Domain     1    47    47     62.2   2.7e-17   1 CL0123
+# A0A009EY70.1     17     60     17     62 PF00440.22  TetR_N            Domain     1    44    47     55.5   3.2e-15   1 CL0123

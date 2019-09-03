@@ -1,13 +1,10 @@
 {
-    "python.formatting.autopep8Args": [
-        "--max-line-length",
-        "120"
-    ],
-    "python.formatting.yapfArgs": [
-        "--style",
-        "pep8"
-    ],
-    "python.pythonPath": "C:\\Users\\Hotdogee\\venv\\tf37\\Scripts\\python.exe",
+    "python.formatting.autopep8Args": ["--max-line-length", "120"],
+    "python.formatting.yapfArgs": ["--style", "{based_on_style: facebook}"],
+    // "python.pythonPath": "C:\\Users\\Hotdogee\\venv\\tf37\\Scripts\\python.exe",
     "python.linting.pylintEnabled": true,
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "python.formatting.provider": "yapf",
+    "editor.formatOnSave": true,
+    "python.pythonPath": "C:\\Users\\Hotdogee\\venv\\tf37\\Scripts\\python.exe"
 }
