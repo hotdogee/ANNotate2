@@ -106,6 +106,9 @@ def verify_output_path(p):
 # fix last seq bug
 # python .\util\pfam\sample_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --num 100 --seed 42
 
+# /usr/bin/time -v -o p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv.2950X.time /opt/PfamScan/pfam_scan.pl -fasta p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa -dir ./ -outfile ./p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv
+# Elapsed (wall clock) time (h:mm:ss or m:ss): 0:24.63
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Sample N sequences from a FASTA file.'
