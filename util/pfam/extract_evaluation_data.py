@@ -118,6 +118,7 @@ def verify_output_path(p):
 # GAVFYALVRTFADLVSDNRDEVIAKHFKLIHRLLFWLDWLPARITSFGYLVIGNFNKGTSCWLHYVFDFSSPNHKVVTYTALAAEQVEERYYGCTFESLLV
 
 # ubuntu 18.04
+# Copy to Downloads: hmmer-3.1b2.tar.gz PfamScan.tar.gz
 # $ cd Downloads
 # $ tar zxf hmmer-3.1b2.tar.gz
 # $ cd hmmer-3.1b2/
@@ -127,6 +128,7 @@ def verify_output_path(p):
 # $ cd easel/
 # $ sudo make install
 # $ cd ../..
+# $ sudo apt update
 # $ sudo apt install -y libmoose-perl bioperl
 # $ tar zxf PfamScan.tar.gz
 # $ sudo mv ./PfamScan /opt
@@ -143,7 +145,7 @@ def verify_output_path(p):
 # runtime: 19:25:00 (1950X)
 
 # /usr/bin/time -v -o p32_seqs_with_p32_regions_of_p31_domains.p31_results.tsv.time /opt/PfamScan/pfam_scan.pl -fasta p32_seqs_with_p32_regions_of_p31_domains.fa -dir ./ -outfile ./p32_seqs_with_p32_regions_of_p31_domains.p31_results.tsv
-# memory: 81.4GB
+# memory: 89GB
 # runtime:  (W2125)
 # runtime: OOM (2920X)
 # runtime: OOM (1950X)
