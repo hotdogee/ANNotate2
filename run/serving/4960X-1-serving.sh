@@ -1,5 +1,6 @@
 CARDID=0
 export CUDA_VISIBLE_DEVICES=0; docker run --runtime=nvidia -p 8501:8501 --mount type=bind,source=/home/hotdogee/export,target=/models/pfam -e MODEL_NAME=pfam -t tensorflow/serving:latest-gpu
+export CUDA_VISIBLE_DEVICES=0; docker run --runtime=nvidia -p 8502:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models.config --model_config_file_poll_wait_seconds=60
 
 # export CUDA_VISIBLE_DEVICES=${CARDID}; tensorflow_model_server --rest_api_port=8501 --model_name=pfam --model_base_path="/data12/checkpoints/pfam-regions-d0-s20/v4-BiRnn/RewarmupGru512x4_step1447452_b1_ws0_lr0.0065_TITANV_8086K1-1.2/export"
 
