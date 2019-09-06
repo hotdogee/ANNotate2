@@ -130,7 +130,8 @@ def verify_outdir_path(p, required_empty=True):
 
 
 # URL = 'https://ann.hanl.in/v101/models/pfam:predict'
-URL = 'http://localhost:8601/v1/models/pfam31:predict'
+# URL = 'http://localhost:8601/v1/models/pfam31:predict'
+URL = 'http://localhost:8601/v1/models/pfam31/versions/1567765316:predict'
 
 
 def serving_predict_fasta(fa_path, out_path):

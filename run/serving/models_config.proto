@@ -12,4 +12,12 @@ model_config_list {
         all {}
     }
   }
+  config {
+    name: 'pfam31-2'
+    base_path: '/models/pfam31-2/'
+    model_platform: 'tensorflow'
+    model_version_policy {
+        all {}
+    }
+  }
 }
