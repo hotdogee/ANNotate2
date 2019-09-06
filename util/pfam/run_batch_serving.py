@@ -3,10 +3,13 @@ import re
 import sys
 import time
 import gzip
+import json
 import errno
 import random
 import struct
+import msgpack
 import logging
+import requests
 import argparse
 import platform
 import subprocess
@@ -20,7 +23,7 @@ from collections import OrderedDict
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.DEBUG,
+    level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
@@ -126,23 +129,74 @@ def verify_outdir_path(p, required_empty=True):
     return path
 
 
+# URL = 'https://ann.hanl.in/v101/models/pfam:predict'
+URL = 'http://localhost:8601/v1/models/pfam31:predict'
+
+
+def serving_predict_fasta(fa_path, out_path):
+    path = Path(fa_path)
+    # if gzipped
+    target = os.path.getsize(path)
+    if path.suffix == '.gz':
+        f = gzip.open(path, mode='rt', encoding='utf-8')
+        target = _gzip_size(path)
+        while target < os.path.getsize(path):
+            # the uncompressed size can't be smaller than the compressed size, so add 4GB
+            target += 2**32
+    else:
+        f = path.open(mode='rt', encoding='utf-8')
+    # initialize
+    seq_list = []
+    entry = {'id': '', 'seq': ''}
+    # current = 0
+    with f as fa_f:
+        for line in fa_f:
+            line_s = line.strip()
+            if len(line_s) > 0 and line_s[0] == '>':
+                if entry['seq']:
+                    seq_list.append(entry)
+                    entry = {'id': '', 'seq': ''}
+                entry['id'] = line.split()[0][1:]
+            else:
+                entry['seq'] += line_s
+        if entry['seq']:  # handle last seq
+            seq_list.append(entry)
+
+    payload = {'instances': [e['seq'] for e in seq_list]}
+    r = requests.post(URL, data=json.dumps(payload))
+    try:
+        predictions = r.json()['predictions']
+    except Exception as exc:
+        print(r.json())
+        raise exc
+    for i in range(len(seq_list)):
+        seq_len = len(seq_list[i]['seq'])
+        del seq_list[i]['seq']
+        seq_list[i]['classes'] = predictions[i]['classes'][:seq_len]
+        seq_list[i]['top_probs'] = predictions[i]['top_probs'][:seq_len]
+        seq_list[i]['top_classes'] = predictions[i]['top_classes'][:seq_len]
+
+    # print(f"{seq_list[0]['id']}:", seq_list[0]['classes'])
+    # write output file
+    f = out_path.open(mode='wb')
+    with f:
+        msgpack.dump(seq_list, f)
+
+    return fa_path
+
+
 # windows
-# python .\util\pfam\run_batch_pfam.py --indir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results
+# python .\util\pfam\run_batch_serving.py --indir D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched --outdir D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched/pfam31_results_raw
 
 # ubuntu 18.04
 # export PERL5LIB=/opt/PfamScan:$PERL5LIB
 # source /home/hotdogee/venv/tf37/bin/activate
-# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/test --outdir /home/hotdogee/pfam/test/p31_results -- workers 12
-# W2125
-# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 4
 # 4960X
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 12 --start 100
-# 8086K1
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 8 --start 33
-# 8086K2
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 8 --start 66
-# 2650v1
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 16 --start 150
+# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched/pfam31_results_raw --workers 2
+# Runtime: 2715.88 s (45m)
+
+# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test2 --outdir /home/hotdogee/pfam/test2/pfam31_results_raw --workers 2
+# Runtime: 21.10 s
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -166,17 +220,8 @@ if __name__ == "__main__":
         '-w',
         '--workers',
         type=int,
-        default=12,
-        help=
-        "Number of concurrent pfam_scan processes to run. (default: %(default)s)"
-    )
-    parser.add_argument(
-        '-s',
-        '--start',
-        type=int,
-        default=0,
-        help=
-        "Index of input file list to start processing. (default: %(default)s)"
+        default=2,
+        help="Number of concurrent processes to run. (default: %(default)s)"
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
@@ -186,44 +231,35 @@ if __name__ == "__main__":
     outdir_path = verify_outdir_path(args.outdir, required_empty=False)
 
     # read existing output paths
-    existing_stems = set([Path(p.stem).stem for p in outdir_path.glob('*.tsv')])
+    existing_stems = set(
+        [Path(p.stem).stem for p in outdir_path.glob('*.msgpack')]
+    )
 
     # read input fasta paths excluding those with existing output
     in_paths = sorted(
         [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
     )
-    in_paths = in_paths[args.start:] + in_paths[:args.start]
-
-    # node name
-    node_name = platform.node()
 
     # ensure threads are cleaned up promptly
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as e:
         future_path = {
             e.submit(
-                subprocess.run, [
-                    '/usr/bin/time', '-v', '-o',
-                    str(
-                        outdir_path /
-                        f'{p.stem}.p31_results.tsv.{node_name}.time'
-                    ), '/opt/PfamScan/pfam_scan.pl', '-fasta',
-                    str(p), '-dir', './', '-outfile',
-                    str(outdir_path / f'{p.stem}.p31_results.tsv')
-                ]
+                serving_predict_fasta, p,
+                outdir_path / f'{p.stem}.pfam31_results_raw.msgpack'
             ): p
             for p in in_paths
         }
         for future in concurrent.futures.as_completed(future_path):
             path = future_path[future]
             try:
-                completed_process = future.result()
+                result = future.result()
             except Exception as exc:
                 logging.info(
-                    f"{'/'.join(path.parts[-2:])} generated an exception: {exc:s}"
+                    f"{'/'.join(path.parts[-2:])} generated an exception: {str(exc)}"
                 )
             else:
                 logging.info(
-                    f"Completed processing {'/'.join(path.parts[-2:])}, returncode={completed_process.returncode}"
+                    f"Completed processing {'/'.join(path.parts[-2:])}"
                 )
 
     logging.info(f'Runtime: {time.time() - start_time:.2f} s')

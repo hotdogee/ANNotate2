@@ -2,9 +2,14 @@ model_config_list {
   config {
     name: 'pfam'
     base_path: '/models/pfam/'
+    model_platform: 'tensorflow'
   }
   config {
     name: 'pfam31'
     base_path: '/models/pfam31/'
+    model_platform: 'tensorflow'
+    model_version_policy {
+        all {}
+    }
   }
 }

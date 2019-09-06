@@ -185,7 +185,7 @@ if __name__ == "__main__":
             out_fs[int(i / seq_per_file)].write(seqs[i].entry)
 
     out_fs = [f.close() for f in out_fs]
-    print(f'Runtime: {time.time() - start_time:.2f} s\n')
+    logging.info(f'Runtime: {time.time() - start_time:.2f} s')
     sys.exit(0)
 
 # python .\util\pfam\split_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa --outdir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed
