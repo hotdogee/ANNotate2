@@ -61,6 +61,8 @@ from tqdm import tqdm
 
 _NEG_INF = -1e9
 
+tfversion = tuple([int(s) for s in tf.__version__.split('.')])
+
 class TqdmFile(object):
     """ A file-like object that will write to tqdm"""
     file = None
@@ -4465,7 +4467,6 @@ def main(unused_args):
         FLAGS.experiment_name, FLAGS.host_script_name
     )
 
-    tfversion = tuple([int(s) for s in tf.__version__.split('.')])
     if tfversion[0] == 1 and tfversion[1] <= 11:
         logger = tf_logging._get_logger() # 1.11
     else:
@@ -4643,6 +4644,26 @@ def main(unused_args):
             checkpoint_path=FLAGS.export_checkpoint
         )
         tf.logging.info('Checkpoint exported to: %s', export_dir)
+        # signature_def['serving_default']:
+        # The given SavedModel SignatureDef contains the following input(s):
+        #     inputs['protein_sequences'] tensor_info:
+        #         dtype: DT_STRING
+        #         shape: (-1)
+        #         name: input_protein_string_tensor:0
+        # The given SavedModel SignatureDef contains the following output(s):
+        #     outputs['classes'] tensor_info:
+        #         dtype: DT_INT32
+        #         shape: (-1, -1)
+        #         name: predictions/ArgMax:0
+        #     outputs['top_classes'] tensor_info:
+        #         dtype: DT_INT32
+        #         shape: (-1, -1, 3)
+        #         name: predictions/TopKV2:1
+        #     outputs['top_probs'] tensor_info:
+        #         dtype: DT_FLOAT
+        #         shape: (-1, -1, 3)
+        #         name: predictions/TopKV2:0
+        # Method name is: tensorflow/serving/predict
     elif FLAGS.job == 'predict':
         pass
     elif FLAGS.job == 'train':

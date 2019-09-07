@@ -14,6 +14,7 @@ import argparse
 import platform
 import subprocess
 import concurrent.futures
+import tensorflow as tf
 from tqdm import tqdm
 from glob import glob
 from pathlib import Path
@@ -194,26 +195,14 @@ def serving_predict_fasta(
 # ubuntu 18.04
 # export PERL5LIB=/opt/PfamScan:$PERL5LIB
 # source /home/hotdogee/venv/tf37/bin/activate
-# 4960X
 
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test2 --outdir /home/hotdogee/pfam/test2/pfam31_results_raw --workers 2
-# Runtime: 21.10 s
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched/pfam31_results_raw --workers 2
-# Runtime: 2715.88 s (45m)
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567765316_results_raw --workers 2
-# Runtime: 2703.33 s
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567786205_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567786591_results_raw --workers 2 --server http://localhost:8601/v1/models/pfam:predict
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567786835_results_raw --workers 2 --server http://localhost:8701/v1/models/pfam:predict
+# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000/pfam31_1567787563_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
+# Runtime: 3369.25 s
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Split a FASTA file into N files.'
+        description=
+        'Run ANNotate prediction locally on each FASTA file in the input directory.'
     )
     parser.add_argument(
         '-i',
