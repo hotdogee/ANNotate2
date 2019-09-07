@@ -2086,7 +2086,7 @@ class Attention(tf.compat.v1.layers.Layer):
 
 
     if self.train:
-      weights = tf.nn.dropout(weights, 1 - (1.0 - self.attention_dropout))
+      weights = tf.nn.dropout(weights, rate=self.attention_dropout)
     attention_output = tf.matmul(weights, v)
 
     # Recombine heads --> [batch_size, length, hidden_size]
@@ -2177,7 +2177,7 @@ def cast_like(x, y):
                        x.device, cast_x.device)
   return cast_x
 
-def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
+def dropout_with_broadcast_dims(x, rate, broadcast_dims=None, **kwargs):
   """Like tf.nn.dropout but takes broadcast_dims instead of noise_shape.
 
   Instead of specifying noise_shape, this function takes broadcast_dims -
@@ -2186,8 +2186,7 @@ def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
 
   Args:
     x: a floating point tensor.
-    keep_prob: A scalar Tensor with the same type as x.
-      The probability that each element is kept.
+    rate: A scalar Tensor with the same type as x. The probability that each element is dropped. 
     broadcast_dims: an optional list of integers
       the dimensions along which to broadcast the keep/drop flags.
     **kwargs: keyword arguments to tf.nn.dropout other than "noise_shape".
@@ -2204,7 +2203,7 @@ def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
     kwargs["noise_shape"] = [
         1 if i in broadcast_dims else shape[i] for i in range(ndims)
     ]
-  return tf.nn.dropout(x, 1 - (keep_prob), **kwargs)
+  return tf.nn.dropout(x, rate, **kwargs)
 
 def should_generate_summaries():
   """Is this an appropriate context to generate summaries.
@@ -2488,7 +2487,7 @@ def dot_product_attention(q,
       save_weights_to[scope.name + "/logits"] = logits
     # Drop out attention links for each head.
     weights = dropout_with_broadcast_dims(
-        weights, 1.0 - dropout_rate, broadcast_dims=dropout_broadcast_dims)
+        weights, rate=dropout_rate, broadcast_dims=dropout_broadcast_dims)
     if should_generate_summaries() and make_image_summary:
       attention_image_summary(weights, image_shapes)
     return tf.matmul(weights, v)
