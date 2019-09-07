@@ -47,6 +47,7 @@ from tensorflow.python.data.ops import iterator_ops
 from tensorflow.python.data.experimental.ops.iterator_ops import _Saveable # 1.12
 from tensorflow.core.util.event_pb2 import SessionLog
 from tensorflow.python.training import training_util
+from tensorflow.python.training import evaluation
 from tensorflow.python.framework import meta_graph
 from tensorflow.python.data.util import nest
 from tensorflow.python.util.nest import is_sequence
@@ -1732,7 +1733,7 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
         self._tensors['global_step'] = tf.compat.v1.train.get_global_step() # global step of checkpoint
         if self._tensors['global_step'] is None:
             raise RuntimeError('Global step should be created to use SaveEvaluationResultHook.')
-        self._tensors['eval_step'] = tf.contrib.training.get_or_create_eval_step() # a counter for the evaluation step
+        self._tensors['eval_step'] = evaluation._get_or_create_eval_step() # a counter for the evaluation step
 
     def before_run(self, run_context):  # pylint: disable=unused-argument
         return tf.estimator.SessionRunArgs(self._tensors)
