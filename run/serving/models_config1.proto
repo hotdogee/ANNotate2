@@ -1,0 +1,7 @@
+model_config_list {
+  config {
+    name: 'pfam'
+    base_path: '/models/pfam1/'
+    model_platform: 'tensorflow'
+  }
+}

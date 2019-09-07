@@ -1,3 +1,6 @@
+# Starting a GPU enabled container on specific GPUs
+$ docker run --gpus '"device=1,2"' nvidia/cuda:9.0-base nvidia-smi
+
 CARDID=0
 export CUDA_VISIBLE_DEVICES=0; docker run --runtime=nvidia -p 8501:8501 --mount type=bind,source=/home/hotdogee/export,target=/models/pfam -e MODEL_NAME=pfam -t tensorflow/serving:latest-gpu
 

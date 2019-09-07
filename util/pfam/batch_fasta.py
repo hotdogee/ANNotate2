@@ -116,6 +116,8 @@ def verify_output_path(p):
 
 # python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched
 # python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_34000 --size 34000
+# python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --size 33000
+# python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_30000 --size 30000
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Split a FASTA file into N approximately equal size batches.'

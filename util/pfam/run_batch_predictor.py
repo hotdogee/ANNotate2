@@ -198,7 +198,6 @@ def serving_predict_fasta(
 
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test2 --outdir /home/hotdogee/pfam/test2/pfam31_results_raw --workers 2
 # Runtime: 21.10 s
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567787530_results_raw --workers 2 --server http://localhost:8601/v1/models/pfam:predict
 
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched/pfam31_results_raw --workers 2
 # Runtime: 2715.88 s (45m)
@@ -211,17 +210,6 @@ def serving_predict_fasta(
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567786591_results_raw --workers 2 --server http://localhost:8601/v1/models/pfam:predict
 
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567786835_results_raw --workers 2 --server http://localhost:8701/v1/models/pfam:predict
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567787010_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
-# Runtime: 2877.63 s
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000/pfam31_1567787530_results_raw --workers 2 --server http://localhost:8601/v1/models/pfam:predict
-# Runtime: 3227.24 s
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567787595_results_raw --workers 2 --server http://localhost:8701/v1/models/pfam:predict
-# Runtime: 2680.85 s
-
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000/pfam31_1567787563_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
