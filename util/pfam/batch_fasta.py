@@ -118,6 +118,12 @@ def verify_output_path(p):
 # python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_34000 --size 34000
 # python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --size 33000
 # python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_30000 --size 30000
+# python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --size 25000
+
+# python ./util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_34000 --size 34000
+# Batch: 418597
+# Runtime: 317.87 s
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Split a FASTA file into N approximately equal size batches.'
@@ -176,9 +182,11 @@ if __name__ == "__main__":
     batch_seqs = []
     max_len = 0
     for seq in seqs:
+        # every sequence in a batch will be padded to the length of the longest sequence in the batch
+        # if adding this sequence to the current batch will result in a size larger than the given limit, and the current batch has at least one sequence in it, write out the batch to file
         if seq.len * (len(batch_seqs) + 1) > args.size and len(batch_seqs) > 0:
             logging.info(f'Batch: {batch_num}')
-            out_path = outdir_path / f'{stem}.{batch_num:05d}{suffix}'
+            out_path = outdir_path / f'{stem}.{batch_num:06d}{suffix}'
             f = out_path.open(mode='wt', encoding='utf-8')
             with f:
                 for s in batch_seqs:
@@ -191,7 +199,7 @@ if __name__ == "__main__":
         batch_seqs.append(seq)
     if len(batch_seqs) > 0:  # last batch
         logging.info(f'Batch: {batch_num}')
-        out_path = outdir_path / f'{stem}.{batch_num:05d}{suffix}'
+        out_path = outdir_path / f'{stem}.{batch_num:06d}{suffix}'
         f = out_path.open(mode='wt', encoding='utf-8')
         with f:
             for s in batch_seqs:

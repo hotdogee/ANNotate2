@@ -312,8 +312,8 @@ if __name__ == "__main__":
 
     print(
         f'''Results:
-         aa_positive: {aa_positive},
-            aa_total: {aa_total},
+         aa_positive: {aa_positive}
+            aa_total: {aa_total}
          aa_accuracy: {aa_accuracy:.3%}
   predicted_positive: {predicted_positive}
      answer_positive: {answer_positive}

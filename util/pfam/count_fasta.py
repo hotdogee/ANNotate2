@@ -84,6 +84,10 @@ def verify_input_path(p):
 # python .\util\pfam\count_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.fa.gz
 # python .\util\pfam\count_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa.gz
 
+# 8086K2
+# python ./util/pfam/count_fasta.py --input /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa
+# python ./util/pfam/count_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Print the number of sequences in a FASTA file.'
@@ -104,7 +108,17 @@ if __name__ == "__main__":
     # read fasta
     seqs = _fa_gz_to_list(input_path)
     seq_count = len(seqs)
-    logging.info(f"Sequence count: {seq_count}")
+    seq_lens = sorted([s.len for s in seqs])
+    aa_count = sum(seq_lens)
+    print(
+        f'''FASTA Stats:
+         sequence_count: {seq_count}
+               aa_count: {aa_count}
+    min_sequence_length: {seq_lens[0]}
+ median_sequence_length: {seq_lens[int(seq_count/2)]}
+average_sequence_length: {aa_count/seq_count:.1f}
+    max_sequence_length: {seq_lens[seq_count-1]}'''
+    )
 
     print(f'Runtime: {time.time() - start_time:.2f} s\n')
     sys.exit(0)
@@ -138,3 +152,23 @@ if __name__ == "__main__":
 # 100%|##################################################7| 17806348298/17882684504 [03:27<00:00, 85904900.12bytes/s]
 # 2019-09-05 01:38:59 INFO     Sequence count: 38168103
 # Runtime: 207.30 s
+
+# $ python ./util/pfam/count_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa
+# FASTA Stats:
+#          sequence_count: 219236
+#                aa_count: 127570640
+#     min_sequence_length: 25
+#  median_sequence_length: 458
+# average_sequence_length: 581.9
+#     max_sequence_length: 26130
+# Runtime: 1.23 s
+
+# $ python ./util/pfam/count_fasta.py --input /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa
+# FASTA Stats:
+#          sequence_count: 38168103
+#                aa_count: 14102519533
+#     min_sequence_length: 9
+#  median_sequence_length: 309
+# average_sequence_length: 369.5
+#     max_sequence_length: 36991
+# Runtime: 234.23 s
