@@ -170,7 +170,7 @@ def serving_predict_fasta(fa_path, predict):
     return seq_list, output
 
 
-def input_worker(input_queue, predict_queue):
+def input_worker(input_queue, predict_queue, devices):
     print('module name:', __name__)
     print('parent process:', os.getppid())
     print('process id:', os.getpid())
@@ -206,10 +206,12 @@ def input_worker(input_queue, predict_queue):
         input = {'protein_sequences': [e['seq'] for e in seq_list]}
         predict_queue.put((input, seq_list, out_path))
         logging.info(f"Input: {'/'.join(fa_path.parts[-2:])}")
-    predict_queue.put('STOP')
+    for device in devices:
+        predict_queue.put('STOP')
 
 
-def predict_worker(predict_queue, output_queue, modeldir_path):
+def predict_worker(predict_queue, output_queue, modeldir_path, device='0'):
+    os.environ['CUDA_VISIBLE_DEVICES'] = device
     print('module name:', __name__)
     print('parent process:', os.getppid())
     print('process id:', os.getpid())
@@ -217,8 +219,12 @@ def predict_worker(predict_queue, output_queue, modeldir_path):
     for input, seq_list, out_path in iter(predict_queue.get, 'STOP'):
         output = predict(input)
         output_queue.put((output, seq_list, out_path))
-        logging.info(f"Predict: {'/'.join(out_path.parts[-2:])}")
-    output_queue.put('STOP')
+        logging.info(f"Predict-{device}: {'/'.join(out_path.parts[-2:])}")
+    if predict_queue.empty():  # last worker to finish
+        logging.info(f"Predict-{device}: STOP")
+        output_queue.put('STOP')
+    else:
+        logging.info(f"Predict-{device}: FINISH")
 
 
 def output_worker(output_queue):
@@ -254,6 +260,12 @@ def output_worker(output_queue):
 # Runtime: 22.88 s (predict + input processing)
 # Runtime: 22.69 s (predict only)
 
+# Implement multi GPU
+# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567889661_results_raw --modeldir /home/hotdogee/models/pfam2/1567889661 --devices 0,1,2
+# Runtime: 30.28 s (1x 1080Ti)
+# Runtime: 19.12 s (2x 1080Ti)
+# Runtime: 16.14 s (3x 1080Ti)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=
@@ -274,18 +286,19 @@ if __name__ == "__main__":
         help="Path to the output directory, required."
     )
     parser.add_argument(
-        '-w',
-        '--workers',
-        type=int,
-        default=1,
-        help="Number of concurrent processes to run. (default: %(default)s)"
-    )
-    parser.add_argument(
         '-m',
         '--modeldir',
         type=str,
         default='/home/hotdogee/models/pfam1/1567719465',
         help="Path to the saved model directory. (default: %(default)s)"
+    )
+    parser.add_argument(
+        '-d',
+        '--devices',
+        type=str,
+        default='0',
+        help=
+        'A comma separated list of CUDA devices to use, ex: "0,1,2". (default: %(default)s)'
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
@@ -310,16 +323,22 @@ if __name__ == "__main__":
     predict_queue = Queue()
     output_queue = Queue()
 
+    # devices
+    devices = args.devices.split(',')
+
     # input process
-    ip = Process(target=input_worker, args=(input_queue, predict_queue))
+    ip = Process(
+        target=input_worker, args=(input_queue, predict_queue, devices)
+    )
     ip.start()
 
     # predict process
-    pp = Process(
-        target=predict_worker,
-        args=(predict_queue, output_queue, modeldir_path)
-    )
-    pp.start()
+    for device in args.devices.split(','):
+        pp = Process(
+            target=predict_worker,
+            args=(predict_queue, output_queue, modeldir_path, device)
+        )
+        pp.start()
 
     # output process
     op = Process(target=output_worker, args=(output_queue, ))
@@ -333,8 +352,6 @@ if __name__ == "__main__":
 
     # join
     try:
-        ip.join()
-        pp.join()
         op.join()
     except Exception as exc:
         logging.info(f"exception: {str(exc)}")
