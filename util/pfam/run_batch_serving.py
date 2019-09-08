@@ -199,6 +199,8 @@ def serving_predict_fasta(
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test2 --outdir /home/hotdogee/pfam/test2/pfam31_results_raw --workers 2
 # Runtime: 21.10 s
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567787530_results_raw --workers 2 --server http://localhost:8601/v1/models/pfam:predict
+# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567719465_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
+# Runtime: 23.64 s
 
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched/pfam31_results_raw --workers 2
 # Runtime: 2715.88 s (45m)
@@ -258,7 +260,6 @@ if __name__ == "__main__":
         help="URL of tensorflow serving server. (default: %(default)s)"
     )
     args, unparsed = parser.parse_known_args()
-    start_time = time.time()
 
     # verify paths
     indir_path = verify_indir_path(args.indir)
@@ -274,6 +275,7 @@ if __name__ == "__main__":
         [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
     )
 
+    start_time = time.time()
     # ensure threads are cleaned up promptly
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as e:
         future_path = {

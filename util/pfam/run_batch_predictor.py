@@ -9,7 +9,6 @@ import random
 import struct
 import msgpack
 import logging
-import requests
 import argparse
 import platform
 import subprocess
@@ -21,6 +20,7 @@ from pathlib import Path
 from collections import defaultdict
 from collections import namedtuple
 from collections import OrderedDict
+from multiprocessing import Process, Queue
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -135,9 +135,7 @@ def verify_outdir_path(p, required_empty=True):
 # URL = 'http://localhost:8601/v1/models/pfam31/versions/1567765316:predict'
 
 
-def serving_predict_fasta(
-    fa_path, out_path, url='http://localhost:8501/v1/models/pfam:predict'
-):
+def serving_predict_fasta(fa_path, predict):
     path = Path(fa_path)
     # if gzipped
     target = os.path.getsize(path)
@@ -166,38 +164,95 @@ def serving_predict_fasta(
         if entry['seq']:  # handle last seq
             seq_list.append(entry)
 
-    payload = {'instances': [e['seq'] for e in seq_list]}
-    r = requests.post(url, data=json.dumps(payload))
-    try:
-        predictions = r.json()['predictions']
-    except Exception as exc:
-        print(r.json())
-        raise exc
-    for i in range(len(seq_list)):
-        seq_len = len(seq_list[i]['seq'])
-        del seq_list[i]['seq']
-        seq_list[i]['classes'] = predictions[i]['classes'][:seq_len]
-        seq_list[i]['top_probs'] = predictions[i]['top_probs'][:seq_len]
-        seq_list[i]['top_classes'] = predictions[i]['top_classes'][:seq_len]
+    input = {'protein_sequences': [e['seq'] for e in seq_list]}
+    output = predict(input)
 
-    # print(f"{seq_list[0]['id']}:", seq_list[0]['classes'])
-    # write output file
-    f = out_path.open(mode='wb')
-    with f:
-        msgpack.dump(seq_list, f)
-
-    return fa_path
+    return seq_list, output
 
 
-# windows
-# python .\util\pfam\run_batch_serving.py --indir D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched --outdir D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched/pfam31_results_raw
+def input_worker(input_queue, predict_queue):
+    print('module name:', __name__)
+    print('parent process:', os.getppid())
+    print('process id:', os.getpid())
+    for fa_path, out_path in iter(input_queue.get, 'STOP'):
+        path = Path(fa_path)
+        # if gzipped
+        target = os.path.getsize(path)
+        if path.suffix == '.gz':
+            f = gzip.open(path, mode='rt', encoding='utf-8')
+            target = _gzip_size(path)
+            while target < os.path.getsize(path):
+                # the uncompressed size can't be smaller than the compressed size, so add 4GB
+                target += 2**32
+        else:
+            f = path.open(mode='rt', encoding='utf-8')
+        # initialize
+        seq_list = []
+        entry = {'id': '', 'seq': ''}
+        # current = 0
+        with f as fa_f:
+            for line in fa_f:
+                line_s = line.strip()
+                if len(line_s) > 0 and line_s[0] == '>':
+                    if entry['seq']:
+                        seq_list.append(entry)
+                        entry = {'id': '', 'seq': ''}
+                    entry['id'] = line.split()[0][1:]
+                else:
+                    entry['seq'] += line_s
+            if entry['seq']:  # handle last seq
+                seq_list.append(entry)
+
+        input = {'protein_sequences': [e['seq'] for e in seq_list]}
+        predict_queue.put((input, seq_list, out_path))
+        logging.info(f"Input: {'/'.join(fa_path.parts[-2:])}")
+    predict_queue.put('STOP')
+
+
+def predict_worker(predict_queue, output_queue, modeldir_path):
+    print('module name:', __name__)
+    print('parent process:', os.getppid())
+    print('process id:', os.getpid())
+    predict = tf.contrib.predictor.from_saved_model(str(modeldir_path))
+    for input, seq_list, out_path in iter(predict_queue.get, 'STOP'):
+        output = predict(input)
+        output_queue.put((output, seq_list, out_path))
+        logging.info(f"Predict: {'/'.join(out_path.parts[-2:])}")
+    output_queue.put('STOP')
+
+
+def output_worker(output_queue):
+    print('module name:', __name__)
+    print('parent process:', os.getppid())
+    print('process id:', os.getpid())
+    for output, seq_list, out_path in iter(output_queue.get, 'STOP'):
+        for i in range(len(seq_list)):
+            seq_len = len(seq_list[i]['seq'])
+            del seq_list[i]['seq']
+            seq_list[i]['classes'] = output['classes'][i][:seq_len].tolist()
+            seq_list[i]['top_probs'] = output['top_probs'][i][:seq_len].tolist()
+            seq_list[i]['top_classes'] = output['top_classes'][i][:seq_len
+                                                                 ].tolist()
+
+        # print(f"{seq_list[0]['id']}:", seq_list[0]['classes'])
+        # write output file
+        f = out_path.open(mode='wb')
+        with f:
+            msgpack.dump(seq_list, f)
+        logging.info(f"Output: {'/'.join(out_path.parts[-2:])}")
+
 
 # ubuntu 18.04
-# export PERL5LIB=/opt/PfamScan:$PERL5LIB
 # source /home/hotdogee/venv/tf37/bin/activate
 
-# python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000/pfam31_1567787563_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
-# Runtime: 3369.25 s
+# 8086K1
+# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567884207_results_raw --workers 1 --modeldir /home/hotdogee/models/pfam2/1567884207
+# Runtime: 23.41 s
+
+# 4960X
+# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567889661_results_raw --workers 1 --modeldir /home/hotdogee/models/pfam2/1567889661
+# Runtime: 22.88 s (predict + input processing)
+# Runtime: 22.69 s (predict only)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -222,21 +277,22 @@ if __name__ == "__main__":
         '-w',
         '--workers',
         type=int,
-        default=2,
+        default=1,
         help="Number of concurrent processes to run. (default: %(default)s)"
     )
     parser.add_argument(
-        '-s',
-        '--server',
+        '-m',
+        '--modeldir',
         type=str,
-        default='http://localhost:8501/v1/models/pfam:predict',
-        help="URL of tensorflow serving server. (default: %(default)s)"
+        default='/home/hotdogee/models/pfam1/1567719465',
+        help="Path to the saved model directory. (default: %(default)s)"
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
     # verify paths
     indir_path = verify_indir_path(args.indir)
+    modeldir_path = verify_indir_path(args.modeldir)
     outdir_path = verify_outdir_path(args.outdir, required_empty=False)
 
     # read existing output paths
@@ -249,28 +305,101 @@ if __name__ == "__main__":
         [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
     )
 
-    # ensure threads are cleaned up promptly
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as e:
-        future_path = {
-            e.submit(
-                serving_predict_fasta, p,
-                outdir_path / f'{p.stem}.pfam31_results_raw.msgpack',
-                args.server
-            ): p
-            for p in in_paths
-        }
-        for future in concurrent.futures.as_completed(future_path):
-            path = future_path[future]
-            try:
-                result = future.result()
-            except Exception as exc:
-                logging.info(
-                    f"{'/'.join(path.parts[-2:])} generated an exception: {str(exc)}"
-                )
-            else:
-                logging.info(
-                    f"Completed processing {'/'.join(path.parts[-2:])}"
-                )
+    # create queues
+    input_queue = Queue()
+    predict_queue = Queue()
+    output_queue = Queue()
+
+    # input process
+    ip = Process(target=input_worker, args=(input_queue, predict_queue))
+    ip.start()
+
+    # predict process
+    pp = Process(
+        target=predict_worker,
+        args=(predict_queue, output_queue, modeldir_path)
+    )
+    pp.start()
+
+    # output process
+    op = Process(target=output_worker, args=(output_queue, ))
+    op.start()
+
+    # submit input tasks
+    for fa_path in in_paths:
+        out_path = outdir_path / f'{fa_path.stem}.pfam31_results_raw.msgpack'
+        input_queue.put((fa_path, out_path))
+    input_queue.put('STOP')
+
+    # join
+    try:
+        ip.join()
+        pp.join()
+        op.join()
+    except Exception as exc:
+        logging.info(f"exception: {str(exc)}")
+        sys.exit(0)
 
     logging.info(f'Runtime: {time.time() - start_time:.2f} s')
     sys.exit(0)
+
+    # Load model from export directory, and make a predict function.
+    # predict = tf.contrib.predictor.from_saved_model(str(modeldir_path))
+    # # >>> predict.feed_tensors
+    # # {'protein_sequences': <tf.Tensor 'input_protein_string_tensor:0' shape=(?,) dtype=string>}
+    # input_dict = {'protein_sequences': ['FIV', 'LMP']}
+    # input_dict = {'protein_sequences': ['FLIM', 'VP', 'AWGST']}
+    # predict(input_dict)
+    # {
+    #     'top_classes': array([
+    #         [
+    #             [1, 9580, 13679],
+    #             [1, 9580, 13679],
+    #             [1, 366, 28],
+    #             [1, 28, 39],
+    #             [1, 295, 371]
+    #         ],
+    #         [
+    #             [1, 9211, 615],
+    #             [1, 9211, 9612],
+    #             [1, 295, 273],
+    #             [1, 273, 295],
+    #             [1, 273, 295]
+    #         ],
+    #         [
+    #             [1, 295, 1204],
+    #             [1, 295, 1204],
+    #             [1, 295, 1204],
+    #             [1, 295, 273],
+    #             [1, 295, 273]
+    #         ]
+    #     ], dtype = int32),
+    #     'top_probs': array([
+    #         [
+    #             [9.9756598e-01, 1.0554678e-04, 6.7393841e-05],
+    #             [9.9559766e-01, 9.8593999e-05, 8.5413361e-05],
+    #             [9.9482805e-01, 1.1286281e-04, 1.0071106e-04],
+    #             [9.9752134e-01, 1.0686450e-04, 8.4549436e-05],
+    #             [9.9998784e-01, 9.4184279e-06, 2.0532018e-06]
+    #         ],
+    #         [
+    #             [9.9867058e-01, 7.3625270e-05, 4.8228339e-05],
+    #             [9.9252945e-01, 5.6753954e-04, 3.9153339e-04],
+    #             [9.9996555e-01, 1.8193850e-05, 8.1562621e-06],
+    #             [9.9994874e-01, 4.9559905e-05, 1.6222458e-06],
+    #             [9.9996805e-01, 3.0887117e-05, 1.0678857e-06]
+    #         ],
+    #         [
+    #             [9.9970752e-01, 2.7202181e-05, 9.1542242e-06],
+    #             [9.9979395e-01, 3.5809506e-05, 9.2555129e-06],
+    #             [9.9981719e-01, 6.7291963e-05, 7.3239585e-06],
+    #             [9.9990547e-01, 8.7760120e-05, 1.9479849e-06],
+    #             [9.9996436e-01, 3.5095421e-05, 4.0521169e-07]
+    #         ]
+    #     ], dtype = float32),
+    #     'classes': array([
+    #         [1, 1, 1, 1, 1],
+    #         [1, 1, 1, 1, 1],
+    #         [1, 1, 1, 1, 1]
+    #     ], dtype = int32)
+    # }

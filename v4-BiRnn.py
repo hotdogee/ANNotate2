@@ -4640,7 +4640,7 @@ def main(unused_args):
             # serving_input_receiver_fn=serving_input_dataset_receiver_fn,
             serving_input_receiver_fn=serving_input_str_receiver_fn,
             assets_extra=None,
-            as_text=False,
+            as_text=True,
             checkpoint_path=FLAGS.export_checkpoint
         )
         tf.logging.info('Checkpoint exported to: %s', export_dir)

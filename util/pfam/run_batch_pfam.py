@@ -197,10 +197,6 @@ if __name__ == "__main__":
     # node name
     node_name = platform.node()
 
-    # Load model from export directory, and make a predict function.
-    export_dir = '/home/hotdogee/models/pfam1/1567719465'
-    predict = tf.contrib.predictor.from_saved_model(export_dir)
-
     # ensure threads are cleaned up promptly
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as e:
         future_path = {
