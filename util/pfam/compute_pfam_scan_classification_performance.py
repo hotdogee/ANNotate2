@@ -111,15 +111,15 @@ def verify_output_path(p):
 
 # windows
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.all_regions_perf.json
+# python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.all_regions_perf.json
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.p32_regions_perf.json
+# python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.p32_regions_perf.json
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.perf.json
+# python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.perf.json
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.perf.json --mode p32
+# python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.perf.json --mode p32
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.perf.json
+# python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.perf.json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     fasta_path = verify_input_path(args.fasta)
     output_path = verify_output_path(args.output)
     logging.info(
-        f"""Computing pfam classification performance with:
+        f"""Computing pfam_scan classification performance with:
   Prediction results: {'/'.join(pred_path.parts[-2:])}
   Regions answers: {'/'.join(ans_path.parts[-2:])}
   FASTA sequences: {'/'.join(fasta_path.parts[-2:])}
@@ -356,7 +356,7 @@ false_discovery_rate: {false_discovery_rate:.3%}
     print(f'Runtime: {time.time() - start_time:.2f} s')
     sys.exit(0)
 
-# Computing pfam classification performance with:
+# Computing pfam_scan classification performance with:
 #   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv
 #   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv
 #   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz
@@ -378,7 +378,7 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #  false_omission_rate: 41.323%
 # Runtime: 62.12 s
 
-# Computing pfam classification performance with:
+# Computing pfam_scan classification performance with:
 #   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv
 #   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz
 #   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz
@@ -399,7 +399,7 @@ false_discovery_rate: {false_discovery_rate:.3%}
 # false_discovery_rate: 18.848%
 #  false_omission_rate: 40.385%
 
-# Computing pfam classification performance with:
+# Computing pfam_scan classification performance with:
 #   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv
 #   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.tsv.gz
 #   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz
@@ -410,7 +410,7 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #        true_positive: 6
 #               recall: 5.714%
 
-# Computing pfam classification performance with:
+# Computing pfam_scan classification performance with:
 #   Prediction results: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv
 #   Regions answers: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz
 #   FASTA sequences: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz
@@ -430,3 +430,7 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #             f1_score: 99.071%
 # false_discovery_rate: 0.000%
 #  false_omission_rate: 1.840%
+
+# merge prep
+# cp -r /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/
+# cp -r /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/

@@ -126,24 +126,6 @@ def verify_outdir_path(p, required_empty=True):
     return path
 
 
-# windows
-# python .\util\pfam\run_batch_pfam.py --indir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results
-
-# ubuntu 18.04
-# export PERL5LIB=/opt/PfamScan:$PERL5LIB
-# source /home/hotdogee/venv/tf37/bin/activate
-# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/test --outdir /home/hotdogee/pfam/test/p31_results -- workers 12
-# W2125
-# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 4
-# 4960X
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 12 --start 100
-# 8086K1
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 8 --start 33
-# 8086K2
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 8 --start 66
-# 2650v1
-# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 16 --start 150
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Run pfam_scan.pl on each FASTA file in the input directory.'
@@ -178,6 +160,13 @@ if __name__ == "__main__":
         help=
         "Index of input file list to start processing. (default: %(default)s)"
     )
+    parser.add_argument(
+        '-l',
+        '--list',
+        action='store_true',
+        help=
+        "Print a list of files to be processed and exit. useful for determining the --start argument to use."
+    )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
@@ -193,6 +182,12 @@ if __name__ == "__main__":
         [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
     )
     in_paths = in_paths[args.start:] + in_paths[:args.start]
+
+    # list files
+    if args.list:
+        for i, path in enumerate(in_paths):
+            print(f"{i:03d}:{' / '.join(path.parts[-2:])}")
+        sys.exit(0)
 
     # node name
     node_name = platform.node()
@@ -228,3 +223,30 @@ if __name__ == "__main__":
 
     logging.info(f'Runtime: {time.time() - start_time:.2f} s')
     sys.exit(0)
+
+# windows
+# python .\util\pfam\run_batch_pfam.py --indir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results
+
+# ubuntu 18.04
+# export PERL5LIB=/opt/PfamScan:$PERL5LIB
+# source /home/hotdogee/venv/tf37/bin/activate
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/test --outdir /home/hotdogee/pfam/test/p31_results -- workers 12
+# W2125
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 4
+# 4960X
+# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 12 --start 100
+# 8086K1
+# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 8 --start 33
+# 8086K2
+# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 8 --start 66
+# 2650v1
+# python ./run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 16 --start 150
+
+# part2
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --list
+# 4960X
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 12 --start 10
+# 8086K1
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 6 --start 4
+# 8086K2
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_pfam.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --workers 6 --start 21
