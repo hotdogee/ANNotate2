@@ -181,8 +181,7 @@ def serving_predict_fasta(
 
     # print(f"{seq_list[0]['id']}:", seq_list[0]['classes'])
     # write output file
-    f = out_path.open(mode='wb')
-    with f:
+    with out_path.open(mode='wb') as f:
         msgpack.dump(seq_list, f)
 
     return fa_path
@@ -260,6 +259,7 @@ if __name__ == "__main__":
         help="URL of tensorflow serving server. (default: %(default)s)"
     )
     args, unparsed = parser.parse_known_args()
+    start_time = time.time()
 
     # verify paths
     indir_path = verify_indir_path(args.indir)
@@ -275,7 +275,6 @@ if __name__ == "__main__":
         [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
     )
 
-    start_time = time.time()
     # ensure threads are cleaned up promptly
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as e:
         future_path = {

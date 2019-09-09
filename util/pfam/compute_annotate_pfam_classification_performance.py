@@ -21,6 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+logging.getLogger().setLevel(logging.INFO)
 
 
 def _gzip_size(path):
@@ -121,7 +122,7 @@ def verify_output_path(p):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Compute pfam_scan.pl performance metrics.'
+        description='Compute ANNotate Pfam performance metrics.'
     )
     parser.add_argument(
         '-p',
@@ -149,7 +150,7 @@ if __name__ == "__main__":
         '--output',
         type=str,
         required=True,
-        help="Path to output performance metrics to in JSON format, required."
+        help="Path to the output JSON file, required."
     )
     parser.add_argument(
         '-m',
