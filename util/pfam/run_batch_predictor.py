@@ -17,8 +17,8 @@ import tensorflow as tf
 from tqdm import tqdm
 from glob import glob
 from pathlib import Path
-from collections import defaultdict
 from collections import namedtuple
+from collections import defaultdict
 from collections import OrderedDict
 from multiprocessing import Process, Queue
 
@@ -106,7 +106,7 @@ def input_worker(input_queue, predict_queue, devices):
 
         input_data = {'protein_sequences': [e['seq'] for e in seq_list]}
         predict_queue.put((input_data, seq_list, out_path))
-        logging.info(f"Input: {'/'.join(fa_path.parts[-2:])}")
+        # logging.info(f"Input: {'/'.join(fa_path.parts[-2:])}")
     for device in devices:
         predict_queue.put('STOP')
 
@@ -122,7 +122,7 @@ def predict_worker(
     for input_data, seq_list, out_path in iter(predict_queue.get, 'STOP'):
         output_data = predict(input_data)
         output_queue.put((output_data, seq_list, out_path))
-        logging.info(f"Predict-{device}: {'/'.join(out_path.parts[-2:])}")
+        # logging.info(f"Predict-{device}: {'/'.join(out_path.parts[-2:])}")
         # free mem
         del input_data
 
@@ -155,14 +155,9 @@ def output_worker(output_queue):
 
         # free mem
         for i in range(len(seq_list)):
-            seq_len = len(seq_list[i]['seq'])
             del seq_list[i]['classes']
             del seq_list[i]['top_probs']
             del seq_list[i]['top_classes']
-            del seq_list[i]
-            del output_data['classes'][i]
-            del output_data['top_probs'][i]
-            del output_data['top_classes'][i]
         del seq_list
         del output_data['classes']
         del output_data['top_probs']
@@ -203,7 +198,10 @@ def output_worker(output_queue):
 # average_sequence_length: 369.5
 #     max_sequence_length: 36991
 # Batch: 418597
-# Runtime: 55267 s (15:21:07) (4x 2080Ti) (690 seq/s) (255000 aa/s)
+# Runtime: 13203 s (03:40:03) (first 100000 batches) (4x 2080Ti)
+# Runtime: 55267 s (15:21:07) (est) (690 seq/s) (255000 aa/s)
+# Runtime: 12346 s (03:25:46) (last 87862 batches) (4x 2080Ti)
+# Runtime: 58819 s (16:20:19) (est) (648 seq/s) (239761 aa/s)
 # Memory: 23.4GB
 
 if __name__ == "__main__":

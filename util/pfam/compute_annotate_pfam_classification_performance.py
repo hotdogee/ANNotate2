@@ -112,13 +112,41 @@ def verify_output_path(p):
 
 # windows
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.perf.json
+# ann31_1567719465_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.p32_regions_perf.json
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.perf.json
+# ann31_1567765316_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567765316_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567765316_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567765316_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567765316_results.p32_regions_perf.json
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.perf.json --mode p32
+# ann31_1567786205_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786205_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786205_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786205_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786205_results.p32_regions_perf.json
 
-# python .\util\pfam\compute_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.perf.json
+# ann31_1567786591_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786591_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786591_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786591_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786591_results.p32_regions_perf.json
+
+# ann31_1567786835_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786835_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786835_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786835_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786835_results.p32_regions_perf.json
+
+# ann31_1567787010_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787010_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787010_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787010_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787010_results.p32_regions_perf.json
+
+# ann31_1567787530_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787530_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787530_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787530_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787530_results.p32_regions_perf.json
+
+# ann31_1567787563_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787563_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787563_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787563_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787563_results.p32_regions_perf.json
+
+# ann31_1567787595_results
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.p32_regions_perf.json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -129,7 +157,7 @@ if __name__ == "__main__":
         '--pred',
         type=str,
         required=True,
-        help="Path to the predicted TSV file, required."
+        help="Path to the ANNotate predicted TSV file, required."
     )
     parser.add_argument(
         '-a',
@@ -211,6 +239,7 @@ if __name__ == "__main__":
     domain_index = {'NO_DOMAIN': 0}
     pred_set = set()
     pred_sequence = {}
+    line_num = 0
 
     # process input by line
     with pred_f, tqdm(
@@ -219,19 +248,20 @@ if __name__ == "__main__":
         for line in pred_f:
             t.update(len(line))
             line = line.strip()
-            if len(line) == 0 or line[0] == '#':
-                continue
+            line_num += 1
+            if line_num == 1:
+                continue  # skip header
             # parse
             tokens = line.split()
             # assert length == 15
             assert (
-                len(tokens) == 15
-            ), f'pred token length: {len(tokens)}, expected: 15'
+                len(tokens) == 4
+            ), f'pred token length: {len(tokens)}, expected: 4'
             # get seq_len
             seq_id = tokens[0]
             seq_len = id_len_dict[seq_id]
             # get domain index
-            domain = tokens[5].split('.')[0]
+            domain = tokens[3]
             if domain not in domain_index:
                 domain_index[domain] = len(domain_index)
             di = domain_index[domain]
@@ -240,7 +270,7 @@ if __name__ == "__main__":
             # add to sequence
             if seq_id not in pred_sequence:
                 pred_sequence[seq_id] = [0] * seq_len
-            seq_start, seq_end = int(tokens[3]), int(tokens[4])
+            seq_start, seq_end = int(tokens[1]), int(tokens[2])
             pred_sequence[seq_id] = pred_sequence[seq_id][:seq_start - 1] + [
                 di
             ] * (seq_end - seq_start + 1) + pred_sequence[seq_id][seq_end:]
@@ -378,54 +408,215 @@ false_discovery_rate: {false_discovery_rate:.3%}
 # Runtime: 62.12 s
 
 # Computing pfam classification performance with:
-#   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv
-#   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz
-#   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz
+#   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.tsv
+#   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv
+#   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz
 #   Mode: all
-#   Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.perf.json
+#   Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.all_regions_perf.json
 # Results:
-#          aa_positive: 44050,
-#             aa_total: 56506,
-#          aa_accuracy: 77.956%
-#   predicted_positive: 191
-#      answer_positive: 260
-#        true_positive: 155
-#       false_positive: 36
-#       false_negative: 105
-#            precision: 81.152%
-#               recall: 59.615%
-#             f1_score: 68.736%
-# false_discovery_rate: 18.848%
-#  false_omission_rate: 40.385%
+#          aa_positive: 102061621
+#             aa_total: 127570640
+#          aa_accuracy: 80.004%
+#   predicted_positive: 462762
+#      answer_positive: 548956
+#        true_positive: 367977
+#       false_positive: 94785
+#       false_negative: 180979
+#            precision: 79.518%
+#               recall: 67.032%
+#             f1_score: 72.743%
+# false_discovery_rate: 20.482%
+#  false_omission_rate: 32.968%
+# Runtime: 63.90 s
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567765316_results.all_regions_perf.json
+# Results:
+#          aa_positive: 101053242
+#             aa_total: 127570640
+#          aa_accuracy: 79.214%
+#   predicted_positive: 412228
+#      answer_positive: 548956
+#        true_positive: 336991
+#       false_positive: 75237
+#       false_negative: 211965
+#            precision: 81.749%
+#               recall: 61.388%
+#             f1_score: 70.120%
+# false_discovery_rate: 18.251%
+#  false_omission_rate: 38.612%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786205_results.all_regions_perf.json
+# Results:
+#          aa_positive: 100333880
+#             aa_total: 127570640
+#          aa_accuracy: 78.650%
+#   predicted_positive: 403588
+#      answer_positive: 548956
+#        true_positive: 330100
+#       false_positive: 73488
+#       false_negative: 218856
+#            precision: 81.791%
+#               recall: 60.132%
+#             f1_score: 69.309%
+# false_discovery_rate: 18.209%
+#  false_omission_rate: 39.868%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786591_results.all_regions_perf.json
+# Results:
+#          aa_positive: 101131742
+#             aa_total: 127570640
+#          aa_accuracy: 79.275%
+#   predicted_positive: 422229
+#      answer_positive: 548956
+#        true_positive: 342135
+#       false_positive: 80094
+#       false_negative: 206821
+#            precision: 81.031%
+#               recall: 62.325%
+#             f1_score: 70.457%
+# false_discovery_rate: 18.969%
+#  false_omission_rate: 37.675%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786835_results.all_regions_perf.json
+# Results:
+#          aa_positive: 96949072
+#             aa_total: 127570640
+#          aa_accuracy: 75.996%
+#   predicted_positive: 375359
+#      answer_positive: 548956
+#        true_positive: 310353
+#       false_positive: 65006
+#       false_negative: 238603
+#            precision: 82.682%
+#               recall: 56.535%
+#             f1_score: 67.153%
+# false_discovery_rate: 17.318%
+#  false_omission_rate: 43.465%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787010_results.all_regions_perf.json
+# Results:
+#          aa_positive: 101351206
+#             aa_total: 127570640
+#          aa_accuracy: 79.447%
+#   predicted_positive: 436777
+#      answer_positive: 548956
+#        true_positive: 352035
+#       false_positive: 84742
+#       false_negative: 196921
+#            precision: 80.598%
+#               recall: 64.128%
+#             f1_score: 71.426%
+# false_discovery_rate: 19.402%
+#  false_omission_rate: 35.872%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787530_results.all_regions_perf.json
+# Results:
+#          aa_positive: 101581410
+#             aa_total: 127570640
+#          aa_accuracy: 79.628%
+#   predicted_positive: 465652
+#      answer_positive: 548956
+#        true_positive: 370552
+#       false_positive: 95100
+#       false_negative: 178404
+#            precision: 79.577%
+#               recall: 67.501%
+#             f1_score: 73.043%
+# false_discovery_rate: 20.423%
+#  false_omission_rate: 32.499%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787563_results.all_regions_perf.json
+# Results:
+#          aa_positive: 99506302
+#             aa_total: 127570640
+#          aa_accuracy: 78.001%
+#   predicted_positive: 400792
+#      answer_positive: 548956
+#        true_positive: 329927
+#       false_positive: 70865
+#       false_negative: 219029
+#            precision: 82.319%
+#               recall: 60.101%
+#             f1_score: 69.477%
+# false_discovery_rate: 17.681%
+#  false_omission_rate: 39.899%
+
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.all_regions_perf.json
+# Results:
+#          aa_positive: 99750620
+#             aa_total: 127570640
+#          aa_accuracy: 78.192%
+#   predicted_positive: 417783
+#      answer_positive: 548956
+#        true_positive: 339719
+#       false_positive: 78064
+#       false_negative: 209237
+#            precision: 81.315%
+#               recall: 61.885%
+#             f1_score: 70.281%
+# false_discovery_rate: 18.685%
+#  false_omission_rate: 38.115%
 
 # Computing pfam classification performance with:
-#   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv
-#   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.tsv.gz
-#   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.fa.gz
-#   Mode: p32
-#   Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.n100.perf.json
+#   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv
+#   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv
+#   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz
+#   Mode: all
+#   Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.p32_regions_perf.json
 # Results:
-#      answer_positive: 105
-#        true_positive: 6
-#               recall: 5.714%
+#      answer_positive: 222373
+#        true_positive: 17240
+#               recall: 7.753%
+# Runtime: 48.40 s
 
 # Computing pfam classification performance with:
-#   Prediction results: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv
-#   Regions answers: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz
-#   FASTA sequences: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz
+#   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.tsv
+#   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv
+#   FASTA sequences: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz
 #   Mode: all
-#   Output: Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.perf.json
+#   Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567719465_results.p32_regions_perf.json
 # Results:
-#          aa_positive: 37631,
-#             aa_total: 38631,
-#          aa_accuracy: 97.411%
-#   predicted_positive: 160
-#      answer_positive: 163
-#        true_positive: 160
-#       false_positive: 0
-#       false_negative: 3
-#            precision: 100.000%
-#               recall: 98.160%
-#             f1_score: 99.071%
-# false_discovery_rate: 0.000%
-#  false_omission_rate: 1.840%
+#      answer_positive: 222373
+#        true_positive: 74178
+#               recall: 33.357%
+# Runtime: 45.99 s
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567765316_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 50486
+#               recall: 22.703%
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786205_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 46044
+#               recall: 20.706%
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786591_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 54728
+#               recall: 24.611%
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567786835_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 35910
+#               recall: 16.149%
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787010_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 63933
+#               recall: 28.750%
+#  Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787530_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 80572
+#               recall: 36.233%
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787563_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 50891
+#               recall: 22.885%
+# Output: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.p32_regions_perf.json
+# Results:
+#      answer_positive: 222373
+#        true_positive: 60705
+#               recall: 27.299%
