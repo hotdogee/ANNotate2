@@ -334,14 +334,20 @@ if __name__ == "__main__":
     # Accuracy per amino acid
     aa_positive = 0
     aa_total = 0
-    for si, ans in ans_sequence.items():
-        aa_total += len(ans)
-        if si not in pred_sequence:
-            continue
-        pred = pred_sequence[si]
-        for i in range(len(ans)):
-            if ans[i] == pred[i]:
-                aa_positive += 1
+    with tqdm(
+        total=len(ans_sequence), unit='seq', dynamic_ncols=True, ascii=True
+    ) as t:
+        for si, ans in ans_sequence.items():
+            t.update(1)
+            aa_total += len(ans)
+            if si not in pred_sequence:
+                continue
+            pred = pred_sequence[si]
+            for i in range(len(ans)):
+                if ans[i] == pred[i]:
+                    aa_positive += 1
+    # set stats
+    print(f'Computing set stats...')
     aa_accuracy = aa_positive / aa_total
     predicted_positive = len(pred_set)
     answer_positive = len(ans_set)
