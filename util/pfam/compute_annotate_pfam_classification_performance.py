@@ -11,6 +11,7 @@ import logging
 import argparse
 from tqdm import tqdm
 from glob import glob
+from array import array
 from pathlib import Path
 from collections import defaultdict
 from collections import namedtuple
@@ -50,6 +51,7 @@ def _open_input_path(input_path):
 def _fa_gz_to_id_len_dict(fa_path):
     """Parse a .fa or .fa.gz file into a dict of {seq_id: seq_len}
     """
+    Seq = namedtuple('Seq', ['len', 'index'])
     path = Path(fa_path)
     # if gzipped
     target = os.path.getsize(path)
@@ -64,6 +66,7 @@ def _fa_gz_to_id_len_dict(fa_path):
     # initialize
     id_len_dict = {}
     seq_len, seq_id = 0, ''
+    i = 0
     # current = 0
     with f as fa_f, tqdm(
         total=target, unit='bytes', dynamic_ncols=True, ascii=True
@@ -73,14 +76,15 @@ def _fa_gz_to_id_len_dict(fa_path):
             line_s = line.strip()
             if len(line_s) > 0 and line_s[0] == '>':
                 if seq_id:
-                    id_len_dict[seq_id] = seq_len
+                    id_len_dict[seq_id] = Seq(seq_len, i)
                     seq_len, seq_id = 0, ''
+                    i += 1
                 # parse header
                 seq_id = line_s.split()[0][1:]
             else:
                 seq_len += len(line_s)
         if seq_id:  # handle last seq
-            id_len_dict[seq_id] = seq_len
+            id_len_dict[seq_id] = Seq(seq_len, i)
     return id_len_dict
 
 
@@ -147,6 +151,12 @@ def verify_output_path(p):
 # ann31_1567787595_results
 # python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.all_regions_perf.json
 # python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p32_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.ann31_1567787595_results.p32_regions_perf.json
+
+# p32_seqs_with_p32_regions_of_p31_domains_2
+# ann31_1567889661_results
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --ans /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
+# python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -237,6 +247,7 @@ if __name__ == "__main__":
 
     # initialize data structures
     domain_index = {'NO_DOMAIN': 0}
+    seq_index = {}
     pred_set = set()
     pred_sequence = {}
     line_num = 0
@@ -259,21 +270,22 @@ if __name__ == "__main__":
             ), f'pred token length: {len(tokens)}, expected: 4'
             # get seq_len
             seq_id = tokens[0]
-            seq_len = id_len_dict[seq_id]
+            seq_len = id_len_dict[seq_id].len
+            si = id_len_dict[seq_id].index
             # get domain index
             domain = tokens[3]
             if domain not in domain_index:
                 domain_index[domain] = len(domain_index)
             di = domain_index[domain]
             # add to set
-            pred_set.add((seq_id, di))
+            pred_set.add((si, di))
             # add to sequence
-            if seq_id not in pred_sequence:
-                pred_sequence[seq_id] = [0] * seq_len
+            if si not in pred_sequence:
+                pred_sequence[si] = array('i', [0] * seq_len)
             seq_start, seq_end = int(tokens[1]), int(tokens[2])
-            pred_sequence[seq_id] = pred_sequence[seq_id][:seq_start - 1] + [
-                di
-            ] * (seq_end - seq_start + 1) + pred_sequence[seq_id][seq_end:]
+            pred_sequence[si] = pred_sequence[si][:seq_start - 1] + array(
+                'i', [di] * (seq_end - seq_start + 1)
+            ) + pred_sequence[si][seq_end:]
 
     # parse ans
     # coordinates are 1-inclusive
@@ -302,30 +314,31 @@ if __name__ == "__main__":
             ), f'ans token length: {len(tokens)}, expected: 7'
             # get seq_len
             seq_id = f'{tokens[0]}.{tokens[1]}'
-            seq_len = id_len_dict[seq_id]
+            seq_len = id_len_dict[seq_id].len
+            si = id_len_dict[seq_id].index
             # get domain index
             domain = tokens[4]
             if domain not in domain_index:
                 domain_index[domain] = len(domain_index)
             di = domain_index[domain]
             # add to set
-            ans_set.add((seq_id, di))
+            ans_set.add((si, di))
             # add to sequence
-            if seq_id not in ans_sequence:
-                ans_sequence[seq_id] = [0] * seq_len
+            if si not in ans_sequence:
+                ans_sequence[si] = array('i', [0] * seq_len)
             seq_start, seq_end = int(tokens[5]), int(tokens[6])
-            ans_sequence[seq_id] = ans_sequence[seq_id][:seq_start - 1] + [
-                di
-            ] * (seq_end - seq_start + 1) + ans_sequence[seq_id][seq_end:]
+            ans_sequence[si] = ans_sequence[si][:seq_start - 1] + array(
+                'i', [di] * (seq_end - seq_start + 1)
+            ) + ans_sequence[si][seq_end:]
 
     # Accuracy per amino acid
     aa_positive = 0
     aa_total = 0
-    for seq_id, ans in ans_sequence.items():
+    for si, ans in ans_sequence.items():
         aa_total += len(ans)
-        if seq_id not in pred_sequence:
+        if si not in pred_sequence:
             continue
-        pred = pred_sequence[seq_id]
+        pred = pred_sequence[si]
         for i in range(len(ans)):
             if ans[i] == pred[i]:
                 aa_positive += 1

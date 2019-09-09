@@ -284,11 +284,11 @@ if __name__ == "__main__":
     output_path = verify_output_path(args.output)
 
     # read input fasta paths
-    in_paths = sorted([p for p in indir_path.glob('*.msgpack')])
+    # in_paths = sorted([p for p in indir_path.glob('*.msgpack')])
 
     # create queues
-    input_queue = Queue()
-    output_queue = Queue()
+    input_queue = Queue(1000)
+    output_queue = Queue(1000)
 
     # input process
     input_processes = []
@@ -302,7 +302,7 @@ if __name__ == "__main__":
     op.start()
 
     # submit input tasks
-    for fa_path in in_paths:
+    for fa_path in indir_path.glob('*.msgpack'):
         input_queue.put((fa_path, ))
     for i in range(args.workers):
         input_queue.put('STOP')
@@ -321,7 +321,7 @@ if __name__ == "__main__":
 # v1 Runtime: 470.25 s
 # PYTHON=/home/hotdogee/venv/tf37/bin/python
 # SCRIPTPATH=/home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/annotate_pfam_batch_msgpack_to_tsv_v2.py
-# WORKERS=6
+# WORKERS=12
 # VERSION=1567719465
 # VERSION=1567787530
 # VERSION=1567787595
@@ -338,6 +338,8 @@ if __name__ == "__main__":
 # PYTHON=/home/hotdogee/venv/tf37/bin/python
 # SCRIPTPATH=/home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/annotate_pfam_batch_msgpack_to_tsv_v2.py
 # ${PYTHON} ${SCRIPTPATH} --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_34000/pfam31_1567889661_results_raw --meta /home/hotdogee/pfam/pfam-regions-d0-s0-meta.json --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --workers 24
+# Runtime: 3689.20 s (24 worker @2920X)
+# cp /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv /data12/pfam/
 
 # PYTHON=/home/hotdogee/venv/tf37/bin/python
 # SCRIPTPATH=/home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/annotate_pfam_batch_msgpack_to_tsv_v2.py
