@@ -639,3 +639,20 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #      answer_positive: 222373
 #        true_positive: 60705
 #               recall: 27.299%
+
+# Output: pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
+# Results:
+#          aa_positive: 12971953709
+#             aa_total: 14102519533
+#          aa_accuracy: 91.983%
+#   predicted_positive: 55711208
+#      answer_positive: 54177531
+#        true_positive: 50729692
+#       false_positive: 4981516
+#       false_negative: 3447839
+#            precision: 91.058%
+#               recall: 93.636%
+#             f1_score: 92.329%
+# false_discovery_rate: 8.942%
+#  false_omission_rate: 6.364%
+# Runtime: 5618.46 s

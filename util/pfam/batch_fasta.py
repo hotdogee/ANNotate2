@@ -124,6 +124,10 @@ def verify_output_path(p):
 # Batch: 418597
 # Runtime: 317.87 s
 
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --size 25000
+# Batch: 571180
+# Runtime: 338.02 s
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Split a FASTA file into N approximately equal size batches.'

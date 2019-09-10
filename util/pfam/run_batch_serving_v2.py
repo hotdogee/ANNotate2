@@ -9,11 +9,10 @@ import random
 import struct
 import msgpack
 import logging
+import requests
 import argparse
 import platform
 import subprocess
-import concurrent.futures
-import tensorflow as tf
 from tqdm import tqdm
 from glob import glob
 from pathlib import Path
@@ -104,31 +103,32 @@ def input_worker(input_queue, predict_queue):
             if entry['seq']:  # handle last seq
                 seq_list.append(entry)
 
-        input_data = {'protein_sequences': [e['seq'] for e in seq_list]}
+        input_data = json.dumps({'instances': [e['seq'] for e in seq_list]})
         predict_queue.put((input_data, seq_list, out_path))
         # logging.info(f"Input: {'/'.join(fa_path.parts[-2:])}")
-    # this doesn't work reliably
-    # for device in devices:
-    #     predict_queue.put('STOP')
 
 
-def predict_worker(predict_queue, output_queue, modeldir_path, device='0'):
-    os.environ['CUDA_VISIBLE_DEVICES'] = device
+def predict_worker(predict_queue, output_queue, server):
     print('module name:', __name__)
     print('parent process:', os.getppid())
     print('process id:', os.getpid())
-    predict = tf.contrib.predictor.from_saved_model(str(modeldir_path))
     for input_data, seq_list, out_path in iter(predict_queue.get, 'STOP'):
-        output_data = predict(input_data)
-        output_queue.put((output_data, seq_list, out_path))
-        # logging.info(f"Predict-{device}: {'/'.join(out_path.parts[-2:])}")
-        # free mem
-        del input_data
-    # this doesn't work reliably
-    # if predict_queue.empty():  # last worker to finish
-    #     # logging.info(f"Predict-{device}: STOP")
-    #     for i in range(writers):
-    #         output_queue.put('STOP')
+        try:
+            r = requests.post(server, data=input_data)
+            output_data = r.json()['predictions']
+            r.close()
+            output_queue.put((output_data, seq_list, out_path))
+            # logging.info(f"Predict-{device}: {'/'.join(out_path.parts[-2:])}")
+            # free mem
+            del input_data
+        except Exception as exc:
+            print(exc)
+            logging.info(
+                f"ERROR: Predict {server}: {'/'.join(out_path.parts[-2:])}"
+            )
+            # put input back into predict_queue
+            time.sleep(5)
+            predict_queue.put((input_data, seq_list, out_path))
 
 
 def output_worker(output_queue):
@@ -139,17 +139,13 @@ def output_worker(output_queue):
         for i in range(len(seq_list)):
             seq_len = len(seq_list[i]['seq'])
             del seq_list[i]['seq']
-            seq_list[i]['classes'] = output_data['classes'][i][:seq_len].tolist(
-            )
-            seq_list[i]['top_probs'] = output_data['top_probs'][i][:seq_len
-                                                                  ].tolist()
-            seq_list[i]['top_classes'] = output_data['top_classes'][i][:seq_len
-                                                                      ].tolist()
+            seq_list[i]['classes'] = output_data[i]['classes'][:seq_len]
+            seq_list[i]['top_probs'] = output_data[i]['top_probs'][:seq_len]
+            seq_list[i]['top_classes'] = output_data[i]['top_classes'][:seq_len]
 
         # print(f"{seq_list[0]['id']}:", seq_list[0]['classes'])
         # write output file
-        f = out_path.open(mode='wb')
-        with f:
+        with out_path.open(mode='wb') as f:
             msgpack.dump(seq_list, f)
 
         # free mem
@@ -157,10 +153,10 @@ def output_worker(output_queue):
             del seq_list[i]['classes']
             del seq_list[i]['top_probs']
             del seq_list[i]['top_classes']
+            del output_data[i]['classes']
+            del output_data[i]['top_probs']
+            del output_data[i]['top_classes']
         del seq_list
-        del output_data['classes']
-        del output_data['top_probs']
-        del output_data['top_classes']
         del output_data
 
         # log
@@ -169,42 +165,16 @@ def output_worker(output_queue):
 
 # ubuntu 18.04
 # source /home/hotdogee/venv/tf37/bin/activate
-# cp -r /data12/checkpoints/pfam-regions-d0-s0/v4-BiRnn/FullGru512x4_hw512_TITANV_W2125-2.4/export_12/1567889661 /home/hotdogee/models/pfam1/
+# cp -r /data12/checkpoints/pfam-regions-d0-s0/v4-BiRnn/FullGru512x4_hw512_rnndrop_TITANRTX_8086K1-1.2/export/1567787530 /home/hotdogee/models/pfam1/
 
-# 8086K1
-# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567884207_results_raw --workers 1 --modeldir /home/hotdogee/models/pfam2/1567884207
-# Runtime: 23.41 s
+# 2920X
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/test_p32_25000 --outdir /home/hotdogee/pfam/test_p32_25000/pfam31_1567787530_results_raw --servers http://localhost:8501/v1/models/pfam:predict --readers 1 --writers 1
 
-# 4960X
-# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567889661_results_raw --workers 1 --modeldir /home/hotdogee/models/pfam2/1567889661
-# Runtime: 22.88 s (predict + input processing)
-# Runtime: 22.69 s (predict only)
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/test_p32_25000 --outdir /home/hotdogee/pfam/test_p32_25000/pfam31_1567787530_results_raw --servers http://localhost:8501/v1/models/pfam:predict,http://localhost:8601/v1/models/pfam:predict,http://localhost:8701/v1/models/pfam:predict,http://192.168.1.33:8501/v1/models/pfam:predict,http://192.168.1.33:8601/v1/models/pfam:predict,http://192.168.1.74:8501/v1/models/pfam:predict,http://192.168.1.74:8601/v1/models/pfam:predict --readers 8 --writers 8
 
-# Implement multi GPU
-# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567889661_results_raw --modeldir /home/hotdogee/models/pfam2/1567889661 --devices 0,1,2
-# Runtime: 30.28 s (1x 1080Ti)
-# Runtime: 19.12 s (2x 1080Ti)
-# Runtime: 16.14 s (3x 1080Ti)
-
-# W2125
-# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/test3 --outdir /home/hotdogee/pfam/test3/pfam31_1567889661_results_raw --modeldir /home/hotdogee/models/pfam1/1567889661 --devices 0,1,2,3
-# Runtime: 17.50 s (4x 2080Ti)
-# python ./util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_34000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_34000/pfam31_1567889661_results_raw --modeldir /home/hotdogee/models/pfam1/1567889661 --devices 0,1,2,3 --writers 4
-#          sequence_count: 38168103
-#                aa_count: 14102519533
-#     min_sequence_length: 9
-#  median_sequence_length: 309
-# average_sequence_length: 369.5
-#     max_sequence_length: 36991
-# Batch: 418597
-# Runtime: 13203 s (03:40:03) (first 100000 batches) (4x 2080Ti)
-# Runtime: 55267 s (15:21:07) (est) (690 seq/s) (255000 aa/s)
-# Runtime: 12346 s (03:25:46) (last 87862 batches) (4x 2080Ti)
-# Runtime: 58819 s (16:20:19) (est) (648 seq/s) (239761 aa/s)
-# Memory: 23.4GB
-
-# W2125
-# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000/pfam31_1567787530_results_raw --modeldir /home/hotdogee/models/pfam2/1567787530 --devices 0,1,2,3 --writers 4
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000/pfam31_1567787530_results_raw --servers http://localhost:8501/v1/models/pfam:predict,http://localhost:8601/v1/models/pfam:predict,http://localhost:8701/v1/models/pfam:predict,http://192.168.1.33:8501/v1/models/pfam:predict,http://192.168.1.33:8601/v1/models/pfam:predict,http://192.168.1.74:8501/v1/models/pfam:predict,http://192.168.1.74:8601/v1/models/pfam:predict --readers 12 --writers 12
+# 272s (2323 batches) (8.54 batches/sec)
+# 880s (8674 batches) (9.85 batches/sec) after switching to generator
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -226,19 +196,19 @@ if __name__ == "__main__":
         help="Path to the output directory, required."
     )
     parser.add_argument(
-        '-m',
-        '--modeldir',
+        '-s',
+        '--servers',
         type=str,
-        default='/home/hotdogee/models/pfam1/1567719465',
-        help="Path to the saved model directory. (default: %(default)s)"
+        required=True,
+        help=
+        'A comma separated list of tensorflow serving server REST URLs, ex: "http://localhost:8501/v1/models/pfam:predict,http://localhost:8601/v1/models/pfam:predict".'
     )
     parser.add_argument(
-        '-d',
-        '--devices',
-        type=str,
-        default='0',
-        help=
-        'A comma separated list of CUDA devices to use, ex: "0,1,2". (default: %(default)s)'
+        '-r',
+        '--readers',
+        type=int,
+        default=4,
+        help='Number of input workers. (default: %(default)s)'
     )
     parser.add_argument(
         '-w',
@@ -252,7 +222,6 @@ if __name__ == "__main__":
 
     # verify paths
     indir_path = verify_indir_path(args.indir)
-    modeldir_path = verify_indir_path(args.modeldir)
     outdir_path = verify_outdir_path(args.outdir, required_empty=False)
 
     # read existing output paths
@@ -260,29 +229,26 @@ if __name__ == "__main__":
         [Path(p.stem).stem for p in outdir_path.glob('*.msgpack')]
     )
 
-    # read input fasta paths excluding those with existing output
-    in_paths = sorted(
-        [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
-    )
-
     # create queues
-    input_queue = Queue()
-    predict_queue = Queue()
-    output_queue = Queue()
+    input_queue = Queue(1000)
+    predict_queue = Queue(1000)
+    output_queue = Queue(1000)
 
-    # devices
-    devices = args.devices.split(',')
+    # servers
+    servers = args.servers.split(',')
 
     # input process
-    ip = Process(target=input_worker, args=(input_queue, predict_queue))
-    ip.start()
+    input_processes = []
+    for i in range(args.readers):
+        ip = Process(target=input_worker, args=(input_queue, predict_queue))
+        ip.start()
+        input_processes.append(ip)
 
     # predict process
     predict_processes = []
-    for device in devices:
+    for server in servers:
         pp = Process(
-            target=predict_worker,
-            args=(predict_queue, output_queue, modeldir_path, device)
+            target=predict_worker, args=(predict_queue, output_queue, server)
         )
         pp.start()
         predict_processes.append(pp)
@@ -295,23 +261,37 @@ if __name__ == "__main__":
         output_processes.append(op)
 
     # submit input tasks
-    for fa_path in in_paths:
+
+    # read input fasta paths excluding those with existing output
+    # in_paths = sorted(
+    #     [p for p in indir_path.glob('*.fa') if p.stem not in existing_stems]
+    # )
+    for fa_path in indir_path.glob('*.fa'):
+        if fa_path.stem in existing_stems:
+            continue
         out_path = outdir_path / f'{fa_path.stem}.pfam31_results_raw.msgpack'
         input_queue.put((fa_path, out_path))
-    input_queue.put('STOP')
+    for i in range(args.readers):
+        input_queue.put('STOP')
 
     # join
     try:
-        ip.join()
+        for ip in input_processes:
+            # logging.info(f"ip.join()")
+            ip.join()
         # push predict stop tokens after all input processes have exited
-        for device in devices:
+        for server in servers:
             predict_queue.put('STOP')
+
         for pp in predict_processes:
+            # logging.info(f"pp.join()")
             pp.join()
         # push output stop tokens after all predict processes have exited
         for i in range(args.writers):
             output_queue.put('STOP')
+
         for op in output_processes:
+            # logging.info(f"op.join()")
             op.join()
     except Exception as exc:
         logging.info(f"exception: {str(exc)}")

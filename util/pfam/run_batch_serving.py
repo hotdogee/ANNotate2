@@ -217,7 +217,7 @@ def serving_predict_fasta(
 # Runtime: 2877.63 s
 
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000/pfam31_1567787530_results_raw --workers 2 --server http://localhost:8601/v1/models/pfam:predict
-# Runtime: 3227.24 s
+# Runtime: 3227.24 s (5240 batches) (1.62 batches/sec)
 
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_33000/pfam31_1567787595_results_raw --workers 2 --server http://localhost:8701/v1/models/pfam:predict
 # Runtime: 2680.85 s
