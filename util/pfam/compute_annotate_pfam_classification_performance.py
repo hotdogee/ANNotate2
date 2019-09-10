@@ -247,7 +247,6 @@ if __name__ == "__main__":
 
     # initialize data structures
     domain_index = {'NO_DOMAIN': 0}
-    seq_index = {}
     pred_set = set()
     pred_sequence = {}
     line_num = 0

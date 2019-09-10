@@ -120,13 +120,12 @@ def verify_indir_path(p):
     if not path.exists():
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
     # existing file or directory
-    if path.exists():
-        if not path.is_dir():
-            raise NotADirectoryError(
-                errno.ENOTDIR, os.strerror(errno.ENOTDIR), path
-            )
-        else:  # got existing directory
-            assert len([x for x in path.iterdir()]) != 0, 'Directory is empty'
+    if not path.is_dir():
+        raise NotADirectoryError(
+            errno.ENOTDIR, os.strerror(errno.ENOTDIR), path
+        )
+    else:  # got existing directory
+        assert len([x for x in path.iterdir()]) != 0, 'Directory is empty'
     return path
 
 

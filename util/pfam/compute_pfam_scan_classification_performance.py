@@ -11,6 +11,7 @@ import logging
 import argparse
 from tqdm import tqdm
 from glob import glob
+from array import array
 from pathlib import Path
 from collections import defaultdict
 from collections import namedtuple
@@ -49,6 +50,7 @@ def _open_input_path(input_path):
 def _fa_gz_to_id_len_dict(fa_path):
     """Parse a .fa or .fa.gz file into a dict of {seq_id: seq_len}
     """
+    Seq = namedtuple('Seq', ['len', 'index'])
     path = Path(fa_path)
     # if gzipped
     target = os.path.getsize(path)
@@ -63,6 +65,7 @@ def _fa_gz_to_id_len_dict(fa_path):
     # initialize
     id_len_dict = {}
     seq_len, seq_id = 0, ''
+    i = 0
     # current = 0
     with f as fa_f, tqdm(
         total=target, unit='bytes', dynamic_ncols=True, ascii=True
@@ -72,14 +75,15 @@ def _fa_gz_to_id_len_dict(fa_path):
             line_s = line.strip()
             if len(line_s) > 0 and line_s[0] == '>':
                 if seq_id:
-                    id_len_dict[seq_id] = seq_len
+                    id_len_dict[seq_id] = Seq(seq_len, i)
                     seq_len, seq_id = 0, ''
+                    i += 1
                 # parse header
                 seq_id = line_s.split()[0][1:]
             else:
                 seq_len += len(line_s)
         if seq_id:  # handle last seq
-            id_len_dict[seq_id] = seq_len
+            id_len_dict[seq_id] = Seq(seq_len, i)
     return id_len_dict
 
 
@@ -109,6 +113,18 @@ def verify_output_path(p):
     return path
 
 
+def verify_input_or_dir_path(p):
+    # get absolute path
+    path = Path(os.path.abspath(os.path.expanduser(p)))
+    # doesn't exist
+    if not path.exists():
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+    # existing file or directory
+    if path.is_dir():  # got existing directory
+        assert len([x for x in path.iterdir()]) != 0, 'Directory is empty'
+    return path
+
+
 # windows
 
 # python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.tsv --ans D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.fa.gz --output D:/pfam/Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.p31_results.all_regions_perf.json
@@ -121,6 +137,8 @@ def verify_output_path(p):
 
 # python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.p31_results.tsv --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.perf.json
 
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_pfam_scan_classification_performance.py  --pred /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv  --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.p31_results.all_regions_perf.json
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Compute pfam_scan.pl performance metrics.'
@@ -130,7 +148,8 @@ if __name__ == "__main__":
         '--pred',
         type=str,
         required=True,
-        help="Path to the predicted TSV file, required."
+        help=
+        "Path to the predicted TSV file or directory of predicted TSV files, required."
     )
     parser.add_argument(
         '-a',
@@ -183,7 +202,7 @@ if __name__ == "__main__":
     # false_omission_rate = FalseNegative / AnswerPositive
 
     # verify paths
-    pred_path = verify_input_path(args.pred)
+    pred_path = verify_input_or_dir_path(args.pred)
     ans_path = verify_input_path(args.ans)
     fasta_path = verify_input_path(args.fasta)
     output_path = verify_output_path(args.output)
@@ -206,45 +225,49 @@ if __name__ == "__main__":
     # parse pred
     # use envelope coordinates, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2808889/
     # coordinates are 1-inclusive
-    pred_f, target = _open_input_path(pred_path)
 
     # initialize data structures
     domain_index = {'NO_DOMAIN': 0}
     pred_set = set()
     pred_sequence = {}
 
-    # process input by line
-    with pred_f, tqdm(
-        total=target, unit='bytes', dynamic_ncols=True, ascii=True
-    ) as t:
-        for line in pred_f:
-            t.update(len(line))
-            line = line.strip()
-            if len(line) == 0 or line[0] == '#':
-                continue
-            # parse
-            tokens = line.split()
-            # assert length == 15
-            assert (
-                len(tokens) == 15
-            ), f'pred token length: {len(tokens)}, expected: 15'
-            # get seq_len
-            seq_id = tokens[0]
-            seq_len = id_len_dict[seq_id]
-            # get domain index
-            domain = tokens[5].split('.')[0]
-            if domain not in domain_index:
-                domain_index[domain] = len(domain_index)
-            di = domain_index[domain]
-            # add to set
-            pred_set.add((seq_id, di))
-            # add to sequence
-            if seq_id not in pred_sequence:
-                pred_sequence[seq_id] = [0] * seq_len
-            seq_start, seq_end = int(tokens[3]), int(tokens[4])
-            pred_sequence[seq_id] = pred_sequence[seq_id][:seq_start - 1] + [
-                di
-            ] * (seq_end - seq_start + 1) + pred_sequence[seq_id][seq_end:]
+    if pred_path.is_dir():
+        pred_paths = pred_path.glob('*.tsv')
+    else:
+        pred_paths = [pred_path]
+    for pred_p in pred_paths:
+        print(f"Parsing {'/'.join(pred_p.parts[-2:])}")
+        pred_f, target = _open_input_path(pred_path)
+        # process input by line
+        with pred_f:
+            for line in pred_f:
+                line = line.strip()
+                if len(line) == 0 or line[0] == '#':
+                    continue
+                # parse
+                tokens = line.split()
+                # assert length == 15
+                assert (
+                    len(tokens) == 15
+                ), f'pred token length: {len(tokens)}, expected: 15'
+                # get seq_len
+                seq_id = tokens[0]
+                seq_len = id_len_dict[seq_id].len
+                si = id_len_dict[seq_id].index
+                # get domain index
+                domain = tokens[5].split('.')[0]
+                if domain not in domain_index:
+                    domain_index[domain] = len(domain_index)
+                di = domain_index[domain]
+                # add to set
+                pred_set.add((si, di))
+                # add to sequence
+                if si not in pred_sequence:
+                    pred_sequence[si] = array('i', [0] * seq_len)
+                seq_start, seq_end = int(tokens[3]), int(tokens[4])
+                pred_sequence[si] = pred_sequence[si][:seq_start - 1] + array(
+                    'i', [di] * (seq_end - seq_start + 1)
+                ) + pred_sequence[si][seq_end:]
 
     # parse ans
     # coordinates are 1-inclusive
@@ -273,33 +296,40 @@ if __name__ == "__main__":
             ), f'ans token length: {len(tokens)}, expected: 7'
             # get seq_len
             seq_id = f'{tokens[0]}.{tokens[1]}'
-            seq_len = id_len_dict[seq_id]
+            seq_len = id_len_dict[seq_id].len
+            si = id_len_dict[seq_id].index
             # get domain index
             domain = tokens[4]
             if domain not in domain_index:
                 domain_index[domain] = len(domain_index)
             di = domain_index[domain]
             # add to set
-            ans_set.add((seq_id, di))
+            ans_set.add((si, di))
             # add to sequence
-            if seq_id not in ans_sequence:
-                ans_sequence[seq_id] = [0] * seq_len
+            if si not in ans_sequence:
+                ans_sequence[si] = array('i', [0] * seq_len)
             seq_start, seq_end = int(tokens[5]), int(tokens[6])
-            ans_sequence[seq_id] = ans_sequence[seq_id][:seq_start - 1] + [
-                di
-            ] * (seq_end - seq_start + 1) + ans_sequence[seq_id][seq_end:]
+            ans_sequence[si] = ans_sequence[si][:seq_start - 1] + array(
+                'i', [di] * (seq_end - seq_start + 1)
+            ) + ans_sequence[si][seq_end:]
 
     # Accuracy per amino acid
     aa_positive = 0
     aa_total = 0
-    for seq_id, ans in ans_sequence.items():
-        aa_total += len(ans)
-        if seq_id not in pred_sequence:
-            continue
-        pred = pred_sequence[seq_id]
-        for i in range(len(ans)):
-            if ans[i] == pred[i]:
-                aa_positive += 1
+    with tqdm(
+        total=len(ans_sequence), unit='seq', dynamic_ncols=True, ascii=True
+    ) as t:
+        for seq_id, ans in ans_sequence.items():
+            t.update(1)
+            aa_total += len(ans)
+            if seq_id not in pred_sequence:
+                continue
+            pred = pred_sequence[seq_id]
+            for i in range(len(ans)):
+                if ans[i] == pred[i]:
+                    aa_positive += 1
+    # set stats
+    print(f'Computing set stats...')
     aa_accuracy = aa_positive / aa_total
     predicted_positive = len(pred_set)
     answer_positive = len(ans_set)
