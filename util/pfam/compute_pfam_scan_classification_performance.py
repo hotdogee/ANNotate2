@@ -139,6 +139,8 @@ def verify_input_or_dir_path(p):
 
 # python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_pfam_scan_classification_performance.py  --pred /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv  --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.p31_results.all_regions_perf.json
 
+# python .\util\pfam\compute_pfam_scan_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv  --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.p31_results.all_regions_perf.json
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Compute pfam_scan.pl performance metrics.'
@@ -237,7 +239,7 @@ if __name__ == "__main__":
         pred_paths = [pred_path]
     for pred_p in pred_paths:
         print(f"Parsing {'/'.join(pred_p.parts[-2:])}")
-        pred_f, target = _open_input_path(pred_path)
+        pred_f, target = _open_input_path(pred_p)
         # process input by line
         with pred_f:
             for line in pred_f:
@@ -268,6 +270,7 @@ if __name__ == "__main__":
                 pred_sequence[si] = pred_sequence[si][:seq_start - 1] + array(
                     'i', [di] * (seq_end - seq_start + 1)
                 ) + pred_sequence[si][seq_end:]
+    logging.info(f"Pred has {len(pred_sequence)} seqs")
 
     # parse ans
     # coordinates are 1-inclusive
@@ -312,6 +315,7 @@ if __name__ == "__main__":
             ans_sequence[si] = ans_sequence[si][:seq_start - 1] + array(
                 'i', [di] * (seq_end - seq_start + 1)
             ) + ans_sequence[si][seq_end:]
+    logging.info(f"Ans has {len(ans_sequence)} seqs")
 
     # Accuracy per amino acid
     aa_positive = 0
@@ -464,3 +468,19 @@ false_discovery_rate: {false_discovery_rate:.3%}
 # merge prep
 # cp -r /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/
 # cp -r /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/p31_results /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed/
+# Pred has 38073253 seqs
+# Results:
+#          aa_positive: 13856742256
+#             aa_total: 14102519533
+#          aa_accuracy: 98.257%
+#   predicted_positive: 53323162
+#      answer_positive: 54177531
+#        true_positive: 52985285
+#       false_positive: 337877
+#       false_negative: 1192246
+#            precision: 99.366%
+#               recall: 97.799%
+#             f1_score: 98.577%
+# false_discovery_rate: 0.634%
+#  false_omission_rate: 2.201%
+# Runtime: 3206.23 s

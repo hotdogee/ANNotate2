@@ -158,6 +158,10 @@ def verify_output_path(p):
 # python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --ans /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta /data12/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
 # python .\util\pfam\compute_annotate_pfam_classification_performance.py  --pred D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --ans D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
 
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results-2.tsv --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results-2.all_regions_perf.json
+
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567787530_results.tsv --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567787530_results.all_regions_perf.json
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Compute ANNotate Pfam performance metrics.'
@@ -285,6 +289,7 @@ if __name__ == "__main__":
             pred_sequence[si] = pred_sequence[si][:seq_start - 1] + array(
                 'i', [di] * (seq_end - seq_start + 1)
             ) + pred_sequence[si][seq_end:]
+    logging.info(f"Pred has {len(pred_sequence)} seqs")
 
     # parse ans
     # coordinates are 1-inclusive
@@ -329,6 +334,7 @@ if __name__ == "__main__":
             ans_sequence[si] = ans_sequence[si][:seq_start - 1] + array(
                 'i', [di] * (seq_end - seq_start + 1)
             ) + ans_sequence[si][seq_end:]
+    logging.info(f"Ans has {len(ans_sequence)} seqs")
 
     # Accuracy per amino acid
     aa_positive = 0
@@ -639,6 +645,9 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #        true_positive: 60705
 #               recall: 27.299%
 
+# Parsed 38168103 seqs from fasta
+# Pred has 37373174 seqs
+# Ans has 38168103 seqs
 # Output: pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.all_regions_perf.json
 # Results:
 #          aa_positive: 12971953709
@@ -654,4 +663,23 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #             f1_score: 92.329%
 # false_discovery_rate: 8.942%
 #  false_omission_rate: 6.364%
-# Runtime: 5618.46 s
+# Runtime: 5618.46 s (input from nas)
+# Runtime: 3127.65 s (from local ssd)
+
+# Output: pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567787530_results.all_regions_perf.json
+# Pred has 37552464 seqs
+# Results:
+#          aa_positive: 12906856628
+#             aa_total: 14102519533
+#          aa_accuracy: 91.522%
+#   predicted_positive: 56256489
+#      answer_positive: 54177531
+#        true_positive: 50717854
+#       false_positive: 5538635
+#       false_negative: 3459677
+#            precision: 90.155%
+#               recall: 93.614%
+#             f1_score: 91.852%
+# false_discovery_rate: 9.845%
+#  false_omission_rate: 6.386%
+# Runtime: 3110.56 s

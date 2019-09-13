@@ -175,6 +175,9 @@ def output_worker(output_queue):
 # python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000/pfam31_1567787530_results_raw --servers http://localhost:8501/v1/models/pfam:predict,http://localhost:8601/v1/models/pfam:predict,http://localhost:8701/v1/models/pfam:predict,http://192.168.1.33:8501/v1/models/pfam:predict,http://192.168.1.33:8601/v1/models/pfam:predict,http://192.168.1.74:8501/v1/models/pfam:predict,http://192.168.1.74:8601/v1/models/pfam:predict --readers 12 --writers 12
 # 272s (2323 batches) (8.54 batches/sec)
 # 880s (8674 batches) (9.85 batches/sec) after switching to generator
+# 24430s (304610 batches) (12.46 batches/sec)
+# fix corrupt p32_seqs_with_p32_regions_of_p31_domains_2.157070.pfam31_results_raw.msgpack
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000/pfam31_1567787530_results_raw --servers http://localhost:8501/v1/models/pfam:predict --readers 1 --writers 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
