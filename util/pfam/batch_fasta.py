@@ -128,6 +128,10 @@ def verify_output_path(p):
 # Batch: 571180
 # Runtime: 338.02 s
 
+############ p31 FullGru512x4_hw512_TITANV_W2125-2.4 epoch 0-15 #############
+# /home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/batch_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_25000 --size 25000
+# Batch: 5240
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Split a FASTA file into N approximately equal size batches.'

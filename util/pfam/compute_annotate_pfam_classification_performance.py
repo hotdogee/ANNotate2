@@ -1,5 +1,6 @@
 import os
 import re
+import csv
 import sys
 import time
 import gzip
@@ -100,11 +101,11 @@ def verify_input_path(p):
     return path
 
 
-def verify_output_path(p):
+def verify_output_path(p, can_exist=False):
     # get absolute path to dataset directory
     path = Path(os.path.abspath(os.path.expanduser(p)))
     # existing file
-    if path.exists():
+    if not can_exist and path.exists():
         raise FileExistsError(errno.ENOENT, os.strerror(errno.EEXIST), path)
     # is dir
     if path.is_dir():
@@ -162,6 +163,8 @@ def verify_output_path(p):
 
 # python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567787530_results.tsv --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567787530_results.all_regions_perf.json
 
+# /home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000.ann31_${VERSION}_results.tsv --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.n10000.tsv --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.n10000.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000.ann31_${VERSION}_results.all_regions_perf.json --outtsv /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000.ann31_results.all_regions_perf.tsv
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Compute ANNotate Pfam performance metrics.'
@@ -191,8 +194,15 @@ if __name__ == "__main__":
         '-o',
         '--output',
         type=str,
-        required=True,
-        help="Path to the output JSON file, required."
+        default='',
+        help="Path to the JSON file for saving results, required."
+    )
+    parser.add_argument(
+        '-t',
+        '--outtsv',
+        type=str,
+        default='',
+        help="Path to the TSV file for appending results, required."
     )
     parser.add_argument(
         '-m',
@@ -227,14 +237,18 @@ if __name__ == "__main__":
     pred_path = verify_input_path(args.pred)
     ans_path = verify_input_path(args.ans)
     fasta_path = verify_input_path(args.fasta)
-    output_path = verify_output_path(args.output)
+    output_path = None
+    if args.output:
+        output_path = verify_output_path(args.output)
+    outtsv_path = None
+    if args.outtsv:
+        outtsv_path = verify_output_path(args.outtsv, can_exist=True)
     logging.info(
         f"""Computing pfam classification performance with:
   Prediction results: {'/'.join(pred_path.parts[-2:])}
   Regions answers: {'/'.join(ans_path.parts[-2:])}
   FASTA sequences: {'/'.join(fasta_path.parts[-2:])}
-  Mode: {args.mode}
-  Output: {'/'.join(output_path.parts[-2:])}"""
+  Mode: {args.mode}"""
     )
 
     # parse fasta into {seq_id: seq_len}
@@ -382,29 +396,52 @@ false_discovery_rate: {false_discovery_rate:.3%}
  false_omission_rate: {false_omission_rate:.3%}'''
     )
 
-    results = {
-        'aa_positive': aa_positive,
-        'aa_total': aa_total,
-        'aa_accuracy': aa_accuracy,
-        'predicted_positive': predicted_positive,
-        'answer_positive': answer_positive,
-        'true_positive': true_positive,
-        'false_positive': false_positive,
-        'false_negative': false_negative,
-        'precision': precision,
-        'recall': recall,
-        'f1_score': f1_score,
-        'false_discovery_rate': false_discovery_rate,
-        'false_omission_rate': false_omission_rate
-    }
-    # save json
-    # output_path
-    if output_path.suffix == '.gz':
-        out_f = gzip.open(output_path, mode='wt', encoding='utf-8')
+    export_version = re.findall(r'ann31_(\d+)_results', pred_path.name)
+    if export_version:
+        export_version = export_version[0]
     else:
-        out_f = output_path.open(mode='wt', encoding='utf-8')
-    with out_f:
-        json.dump(results, out_f, indent=2)
+        export_version = 'N/A'
+
+    results = OrderedDict(
+        {
+            'prediction_name': pred_path.name,
+            'export_version': export_version,
+            'aa_positive': aa_positive,
+            'aa_total': aa_total,
+            'aa_accuracy': aa_accuracy,
+            'predicted_positive': predicted_positive,
+            'answer_positive': answer_positive,
+            'true_positive': true_positive,
+            'false_positive': false_positive,
+            'false_negative': false_negative,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1_score,
+            'false_discovery_rate': false_discovery_rate,
+            'false_omission_rate': false_omission_rate
+        }
+    )
+
+    # save json
+    if output_path:
+        if output_path.suffix == '.gz':
+            out_f = gzip.open(output_path, mode='wt', encoding='utf-8')
+        else:
+            out_f = output_path.open(mode='wt', encoding='utf-8')
+        with out_f:
+            json.dump(results, out_f, indent=2)
+
+    # save tsv
+    if outtsv_path:
+        fieldnames = list(results.keys())
+        output_exists = outtsv_path.exists()
+        with outtsv_path.open(mode='at', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(
+                f, fieldnames=fieldnames, delimiter='\t', lineterminator='\n'
+            )
+            if not output_exists:
+                writer.writeheader()
+            writer.writerow(results)
 
     print(f'Runtime: {time.time() - start_time:.2f} s')
     sys.exit(0)

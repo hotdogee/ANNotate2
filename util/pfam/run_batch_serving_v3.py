@@ -115,8 +115,7 @@ def predict_worker(predict_queue, output_queue, server):
     for input_data, seq_list, out_path in iter(predict_queue.get, 'STOP'):
         try:
             r = requests.post(server, data=input_data)
-            results = r.json()
-            output_data = results['predictions']
+            output_data = r.json()['predictions']
             r.close()
             output_queue.put((output_data, seq_list, out_path))
             # logging.info(f"Predict-{device}: {'/'.join(out_path.parts[-2:])}")
@@ -124,7 +123,6 @@ def predict_worker(predict_queue, output_queue, server):
             del input_data
         except Exception as exc:
             print(exc)
-            print(results)
             logging.info(
                 f"ERROR: Predict {server}: {'/'.join(out_path.parts[-2:])}"
             )
@@ -182,11 +180,7 @@ def output_worker(output_queue):
 # fix corrupt p32_seqs_with_p32_regions_of_p31_domains_2.157070.pfam31_results_raw.msgpack
 # python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000/pfam31_1567787530_results_raw --servers http://localhost:8501/v1/models/pfam:predict --readers 1 --writers 1
 
-#========p32 n10000=======
-# /home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000_fa_batched_34000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000_fa_batched_34000/ann31_${VERSION}_results_raw --servers http://localhost:8501/v1/models/pfam/versions/${VERSION}:predict,http://localhost:8601/v1/models/pfam/versions/${VERSION}:predict,http://localhost:8701/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.33:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.33:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.34:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.34:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.74:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.74:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8701/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8801/v1/models/pfam/versions/${VERSION}:predict --readers 12 --writers 12
-# OOM
-# /home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v2.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000_fa_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000_fa_batched_25000/ann31_${VERSION}_results_raw --servers http://localhost:8501/v1/models/pfam/versions/${VERSION}:predict,http://localhost:8601/v1/models/pfam/versions/${VERSION}:predict,http://localhost:8701/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.33:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.33:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.34:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.34:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.74:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.74:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8501/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8601/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8701/v1/models/pfam/versions/${VERSION}:predict,http://192.168.1.35:8801/v1/models/pfam/versions/${VERSION}:predict --readers 12 --writers 12
-# /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/run/predict/20190913-p32-n1000/run_p32_n1000.sh
+# python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_serving_v3.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000_fa_batched_34000 --outroot /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000_fa_batched_34000 --outname ann_{version}_results_raw --servers http://localhost:8501/v1/models/pfam:predict --readers 1 --writers 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -281,7 +275,7 @@ if __name__ == "__main__":
     for fa_path in indir_path.glob('*.fa'):
         if fa_path.stem in existing_stems:
             continue
-        out_path = outdir_path / f'{fa_path.stem}.ann31_results_raw.msgpack'
+        out_path = outdir_path / f'{fa_path.stem}.pfam31_results_raw.msgpack'
         input_queue.put((fa_path, out_path))
     for i in range(args.readers):
         input_queue.put('STOP')

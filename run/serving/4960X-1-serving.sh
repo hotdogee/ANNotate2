@@ -23,6 +23,14 @@ docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=1 -p 8601:8501 --mount typ
 
 docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=2 -p 8701:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config3.proto --file_system_poll_wait_seconds=60
 
+docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=0 -p 8501:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config_pfam1_all.proto --file_system_poll_wait_seconds=60
+docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=1 -p 8601:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config_pfam1_all.proto --file_system_poll_wait_seconds=60
+docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=2 -p 8701:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config_pfam1_all.proto --file_system_poll_wait_seconds=60
+
+docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=0 -p 8501:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config_pfam3_all.proto
+docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=1 -p 8601:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config_pfam3_all.proto
+docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=2 -p 8701:8501 --mount type=bind,source=/home/hotdogee/models,target=/models -t tensorflow/serving:latest-gpu --model_config_file=/models/models_config_pfam3_all.proto
+
 # export CUDA_VISIBLE_DEVICES=${CARDID}; tensorflow_model_server --rest_api_port=8501 --model_name=pfam --model_base_path="/data12/checkpoints/pfam-regions-d0-s20/v4-BiRnn/RewarmupGru512x4_step1447452_b1_ws0_lr0.0065_TITANV_8086K1-1.2/export"
 
 # export CUDA_VISIBLE_DEVICES=0; tensorflow_model_server --rest_api_port=8501 --model_name=pfam --model_base_path="/home/hotdogee/export"
@@ -35,7 +43,36 @@ docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=2 -p 8701:8501 --mount typ
 
 
 curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://localhost:8501/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://localhost:8601/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://localhost:8701/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.74:8501/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.74:8601/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.33:8501/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.33:8601/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.34:8501/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.34:8601/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8501/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8601/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8701/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8801/v1/models/pfam:predict
+
 curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.63:8501/v1/models/pfam:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://localhost:8501/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.33:8501/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.34:8501/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8501/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.74:8501/v1/models/pfam/versions/1568346278:predict
+
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://localhost:8601/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.33:8601/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.34:8601/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8601/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.74:8601/v1/models/pfam/versions/1568346278:predict
+
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://localhost:8701/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8701/v1/models/pfam/versions/1568346278:predict
+curl -d '{"instances": ["FLIM","VP","AWGST"]}' -X POST http://192.168.1.35:8801/v1/models/pfam/versions/1568346278:predict
+
 # {
 #     "predictions": [
 #         {
