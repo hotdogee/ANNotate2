@@ -98,6 +98,7 @@ def load_data(uniprot_file='uniprot.gz',
               index_from=1,
               cache_subdir='datasets',
               cache_dir='~',
+              default_domain_list=[],
               **kwargs):
     """Loads the Pfam classification dataset.
 
@@ -116,6 +117,9 @@ def load_data(uniprot_file='uniprot.gz',
             specified the file will be saved at that location.
         cache_dir: Location to store cached files, when None it
             defaults to '~/.keras'.
+        default_domain_list: If empty list, will build new domain list. If given existing
+            domain list, will use existing index and add new domains to the end of list.
+            default: []
 
     # Returns
         Tuple of Numpy arrays: `(x_train, y_train), (x_test, y_test)`.
@@ -229,7 +233,8 @@ def load_data(uniprot_file='uniprot.gz',
     # Collected 54,223,493 Sequences with 16,712 Domains
 
     # create train test split for every domain
-    domain_list = []
+    domain_list = default_domain_list[:] # copy
+    domain_set = set(default_domain_list)
     train_set = set()
     test_set = set()
     np.random.seed(seed)
@@ -246,7 +251,9 @@ def load_data(uniprot_file='uniprot.gz',
         seq_count = len(domain_seq_dict[pfamA_acc])
         if seq_count < 2: # need at least 2 sequences
             continue
-        domain_list.append(pfamA_acc)
+        if pfamA_acc not in domain_set:
+            domain_set.add(pfamA_acc)
+            domain_list.append(pfamA_acc)
         # calculate expected train test counts
         if test_split < 0.5:
             test_count = math.ceil(seq_count * test_split)
@@ -287,9 +294,12 @@ def load_data(uniprot_file='uniprot.gz',
     # Collected 50,066 Training Sequences and 49,799 Testing Sequences with 16,711 Domains
     # 16712/16712 [==============================] - 75s 5ms/step
     # Collected 43,373,043 Training Sequences and 10,850,449 Testing Sequences with 16,711 Domains
-
-    domain_list.reverse() # popular domains first
-    domain_list = ['PAD', 'NO_DOMAIN', 'UNKNOWN_DOMAIN'] + domain_list
+    # print(f'DEBUG: len(default_domain_list)={len(default_domain_list)}')
+    # print(f'DEBUG: len(domain_list)={len(domain_list)}')
+    # print(f'DEBUG: len(domain_set)={len(domain_set)}')
+    if len(default_domain_list) == 0: # if no default domain list
+        domain_list.reverse() # popular domains first
+        domain_list = ['PAD', 'NO_DOMAIN', 'UNKNOWN_DOMAIN'] + domain_list
     # build domain to id mapping
     domain_index = dict([(d, i) for i, d in enumerate(domain_list)])
     aa_index = dict(
@@ -536,8 +546,12 @@ if __name__ == "__main__":
     # args.cache_root = 'D:\\'
     # print(args)
     # read existing meta
+    domain_list = []
     if args.meta_file:
-        meta_path = verify_indir_path(args.meta_file)
+        meta_path = verify_input_path(args.meta_file)
+        with meta_path.open(mode='rt') as f:
+            meta = json.load(f)
+            domain_list = meta['domain_list']
 
     file_prefix = 'pfam-regions-d{}-s{}'.format(args.num_classes or 0, int(args.test_split * 100))
     if args.max_seq_per_class_in_train:
@@ -556,7 +570,9 @@ if __name__ == "__main__":
         num_domain=args.num_classes, test_split=args.test_split,
         max_seq_per_class_in_train=args.max_seq_per_class_in_train,
         max_seq_per_class_in_test=args.max_seq_per_class_in_test,
-        cache_subdir=dataset_dir)
+        cache_subdir=dataset_dir,
+        default_domain_list=domain_list
+    )
 
     meta_f = Path(dataset_dir, '{}-meta.json'.format(file_prefix))
     print('Writing Metadata: {} ... '.format(meta_f), end="", flush=True)
