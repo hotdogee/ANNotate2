@@ -501,6 +501,19 @@ def save_to_tfrecord(data, path):
     # Writing E:/datasets2\pfam-regions-d0-s20-test.tfrecords
     # 10848467/10848467 [==============================] - 65627s 6ms/step
 
+
+def verify_input_path(p):
+    # get absolute path
+    path = Path(os.path.abspath(os.path.expanduser(p)))
+    # doesn't exist
+    if not path.exists():
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+    # is dir
+    if path.is_dir():
+        raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
+    return path
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Builds the pfam regions tfrecords dataset.')
@@ -514,10 +527,17 @@ if __name__ == "__main__":
         help='Maximum the number of sequences to include in the testing datasets, default is no limit.')
     parser.add_argument('-d', '--dataset_dir', type=str, default='~/datasets',
         help="Location to store dataset files, default is ~/datasets.")
+    parser.add_argument('-p', '--pfam_version', type=str, default='31.0',
+        help="Pfam version to download, default is 31.0.")
+    parser.add_argument('-m', '--meta_file', type=str, default=None,
+        help="Maintain existing domain index mapping from this meta file.")
 
     args, unparsed = parser.parse_known_args()
     # args.cache_root = 'D:\\'
     # print(args)
+    # read existing meta
+    if args.meta_file:
+        meta_path = verify_indir_path(args.meta_file)
 
     file_prefix = 'pfam-regions-d{}-s{}'.format(args.num_classes or 0, int(args.test_split * 100))
     if args.max_seq_per_class_in_train:
@@ -532,6 +552,7 @@ if __name__ == "__main__":
     # print('Loading data...')
     # (x_train, y_train_class, maxlen_train), (x_test, y_test_class, maxlen_test), domain_list = load_data(
     dataset, metadata = load_data(
+        origin_base=f'ftp://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam{args.pfam_version}/',
         num_domain=args.num_classes, test_split=args.test_split,
         max_seq_per_class_in_train=args.max_seq_per_class_in_train,
         max_seq_per_class_in_test=args.max_seq_per_class_in_test,

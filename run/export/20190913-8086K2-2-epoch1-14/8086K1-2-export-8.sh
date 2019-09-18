@@ -47,3 +47,5 @@ done
 # 1568367665
 # 1568367676
 # 1567787563
+
+# cp -r /data12/checkpoints/pfam-regions-d0-s0/v4-BiRnn/FullGru512x4_hw512_attpost_rnndrop_TITANRTX_8086K1-2.2/export_epoch/* /home/hotdogee/models/pfam6/
