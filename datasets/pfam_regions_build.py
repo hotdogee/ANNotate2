@@ -249,8 +249,8 @@ def load_data(uniprot_file='uniprot.gz',
     for i, pfamA_acc in enumerate(sorted(domain_seq_dict, key=lambda k: (len(domain_seq_dict[k]), k))):
         prog.update(i)
         seq_count = len(domain_seq_dict[pfamA_acc])
-        if seq_count < 2: # need at least 2 sequences
-            continue
+        # if seq_count < 2: # need at least 2 sequences
+        #     continue
         if pfamA_acc not in domain_set:
             domain_set.add(pfamA_acc)
             domain_list.append(pfamA_acc)
