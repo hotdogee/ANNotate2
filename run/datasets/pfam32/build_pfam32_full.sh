@@ -1,6 +1,7 @@
 # Make full dataset
 /home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/datasets/pfam_regions_build.py --pfam_version 32.0 --test_split 0 --meta_file /home/hotdogee/datasets3/pfam-regions-d0-s0-meta.json --dataset_dir /home/hotdogee/datasets3/Pfam32.0
 # W2125
+# Memory Usage: VIRT: 171G
 # Preparing Dataset: pfam-regions-d0-s0
 # Loading Protein Sequence Data from SOURCE: /home/hotdogee/datasets3/Pfam32.0/uniprot.gz
 # 49586165246/49586165246==============================] - 1014s 0us/step
@@ -16,3 +17,9 @@
 # 17929/17929==============================] - 79s 4ms/step
 # Collected 88,966,232 Training Sequences and 0 Testing Sequences with 0 Domains
 # Generating Domain Sequence Representation for TRAIN Dataset
+
+/home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/datasets/pfam_regions_build_v2.py --pfam_version 32.0 --test_split 0 --meta_file /home/hotdogee/datasets3/pfam-regions-d0-s0-meta.json --dataset_dir /home/hotdogee/datasets3/Pfam32.0
+
+/home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/datasets/pfam_regions_build_v3.py --pfam_version 32.0 --test_split 0 --meta_file /home/hotdogee/datasets3/pfam-regions-d0-s0-meta.json --dataset_dir /home/hotdogee/datasets3/Pfam32.0 --writers 32
+# Memory Usage: VIRT: 106G
+# +15G per writer
