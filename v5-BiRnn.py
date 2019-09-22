@@ -61,7 +61,7 @@ from tqdm import tqdm
 
 _NEG_INF = -1e9
 
-tfversion = tuple([int(s) for s in tf.__version__.split('.')])
+tfversion = tuple([int(s) for s in tf.__version__.split('-')[0].split('.')])
 
 class TqdmFile(object):
     """ A file-like object that will write to tqdm"""
@@ -388,7 +388,7 @@ def input_fn(mode, params, config):
             # the number of bytes in the read buffer. 0 means no buffering.
         )  # 256 MB
 
-    dataset = dataset.apply(tf.contrib.data.parallel_interleave(
+    dataset = dataset.interleave(
         map_func=tfrecord_dataset,
         # A function mapping a nested structure of tensors to a Dataset
         cycle_length=params.dataset_parallel_reads,
@@ -396,18 +396,8 @@ def input_fn(mode, params, config):
         block_length=1,
         # The number of consecutive elements to pull from an input
         # `Dataset` before advancing to the next input `Dataset`.
-        sloppy=True,
-        # If false, elements are produced in deterministic order. Otherwise,
-        # the implementation is allowed, for the sake of expediency, to produce
-        # elements in a non-deterministic order.
-        buffer_output_elements=None,
-        # The number of elements each iterator being
-        # interleaved should buffer (similar to the `.prefetch()` transformation for
-        # each interleaved iterator).
-        prefetch_input_elements=None
-        # The number of input elements to transform to
-        # iterators before they are needed for interleaving.
-    ))
+        num_parallel_calls=None
+    )
 
     if mode == tf.estimator.ModeKeys.TRAIN:
         dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(
@@ -452,7 +442,7 @@ def input_fn(mode, params, config):
     else:
         padded_shapes = {'protein': [None], 'lengths': []}
 
-    dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
+    dataset = dataset.apply(tf.data.experimental.bucket_by_sequence_length(
         element_length_func=lambda seq, dom: seq['lengths'],
         bucket_boundaries=[2 ** x for x in range(5, 15)], # 32 ~ 16384
         bucket_batch_sizes=[params.batch_size * 2 ** x for x in range(10, -1, -1)], # 1024 ~ 1
