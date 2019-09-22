@@ -16,3 +16,8 @@ export CUDA_VISIBLE_DEVICES=${CARDID}; ${PYTHON} ${TFSCRIPT}.py --experiment_nam
 # 2019-09-21 13:44:49,465 Gru512x4-hw512 W2125-4.4[2314] INFO accuracy: 21.24207%, loss:  8.51614, lr:  0.00007, step:     200 (182.557 sec)
 # 2019-09-21 13:47:52,180 Gru512x4-hw512 W2125-4.4[2314] INFO global_step/sec: 1.09459
 # 2019-09-21 13:47:52,181 Gru512x4-hw512 W2125-4.4[2314] INFO accuracy: 40.46223%, loss:  6.64726, lr:  0.00007, step:     400 (182.716 sec)
+
+# tf1.15.0-rc0 numpy-mkl
+# 2019-09-22 09:11:35,127 Gru512x4-hw512 W2125-4.4[12120] INFO accuracy: 30.00043%, loss:  7.65304, lr:  0.00007, step:     200 (186.030 sec)
+# 2019-09-22 09:14:38,421 Gru512x4-hw512 W2125-4.4[12120] INFO global_step/sec: 1.09113
+# 2019-09-22 09:14:38,423 Gru512x4-hw512 W2125-4.4[12120] INFO accuracy: 46.96364%, loss:  5.90858, lr:  0.00007, step:     400 (183.296 sec)

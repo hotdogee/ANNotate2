@@ -68,13 +68,14 @@ class TqdmFile(object):
     file = None
     def __init__(self, file):
         self.file = file
-
     def write(self, x):
         # Avoid print() second call (useless \n)
         if len(x.rstrip()) > 0:
             # print(Fore.RED + 'some red text' + Style.RESET_ALL)
-            tqdm.write(x, file=self.file)
-
+            if tfversion[0] == 1 and tfversion[1] <= 12:
+                tqdm.write(x, file=self.file)
+            else:
+                tqdm.write(x.rstrip(), file=self.file)
     def flush(self):
         return getattr(self.file, "flush", lambda: None)()
 
@@ -400,12 +401,17 @@ def input_fn(mode, params, config):
     )
 
     if mode == tf.estimator.ModeKeys.TRAIN:
-        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(
-            buffer_size=params.shuffle_buffer,
-            # the maximum number elements that will be buffered when prefetching.
-            count=params.repeat_count
-            # the number of times the dataset should be repeated
-        ))
+        if tfversion[0] == 1 and tfversion[1] <= 13:
+            dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(
+                buffer_size=params.shuffle_buffer,
+                # the maximum number elements that will be buffered when prefetching.
+                count=params.repeat_count
+                # the number of times the dataset should be repeated
+            ))
+        else:
+            dataset = dataset.shuffle(buffer_size=params.shuffle_buffer)
+            if params.repeat_count != 1:
+                dataset = dataset.repeat(count=params.repeat_count)
 
     parse_fn = parse_sequence_example
     if params.data_version == 'v2':
@@ -2347,7 +2353,7 @@ def embedding_to_padding(emb):
     embedding vector is all zero, and is 0 otherwise.
   """
   emb_sum = tf.reduce_sum(tf.abs(emb), axis=-1)
-  return tf.to_float(tf.equal(emb_sum, 0.0))
+  return tf.cast(tf.equal(emb_sum, 0.0), dtype=tf.float32)
 
 def combine_last_two_dimensions(x):
   """Reshape x so that the last two dimension become one.
@@ -2866,7 +2872,7 @@ def noam_norm(x, epsilon=1.0, name=None):
     shape = x.get_shape()
     ndims = len(shape)
     return (tf.nn.l2_normalize(x, ndims - 1, epsilon=epsilon) * tf.sqrt(
-        tf.to_float(shape[-1])))
+        tf.cast(shape[-1], dtype=tf.float32)))
 
 def l2_layer_norm(x, filters=None, epsilon=1e-6, name=None, reuse=None):
   """Layer normalization with l2 norm."""
@@ -3998,7 +4004,7 @@ def model_fn(features, labels, mode, params, config):
                 tf.equal(predictions['classes'], labels), tf.float32)
             is_correct = tf.multiply(is_correct, mask)
             num_values = tf.multiply(mask, tf.ones_like(is_correct))
-            batch_accuracy = tf.div(tf.reduce_sum(
+            batch_accuracy = tf.math.divide(tf.reduce_sum(
                 is_correct), tf.reduce_sum(num_values))
         tf.summary.scalar('accuracy', batch_accuracy)
         # tf.summary.scalar('accuracy', metrics['accuracy'][0])
@@ -4042,9 +4048,9 @@ def model_fn(features, labels, mode, params, config):
             tf.logging.info('Applying %s learning rate warmup for %d steps',
                             warmup_schedule, warmup_steps)
 
-            local_step = tf.to_float(local_step)
-            warmup_steps = tf.to_float(warmup_steps)
-            start = tf.to_float(start)
+            local_step = tf.cast(local_step, dtype=tf.float32)
+            warmup_steps = tf.cast(warmup_steps, dtype=tf.float32)
+            start = tf.cast(start, dtype=tf.float32)
             warmup = tf.constant(1.)
             if warmup_schedule == 'exp':
                 warmup = tf.exp(tf.log(start) / warmup_steps)**(warmup_steps - local_step)
@@ -4529,6 +4535,7 @@ def main(unused_args):
         if len(logging.getLogger().handlers) != 0:
             # Remove ABSLHandler
             logging.getLogger().handlers.pop()
+        if len(logger.handlers) == 0:
             # Add our own handler
             _handler = logging.StreamHandler(sys.stderr)
             _handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT, None))
@@ -4556,7 +4563,7 @@ def main(unused_args):
             h.release()
 
     tf.logging.set_verbosity(tf.logging.DEBUG)
-    # tf.logging.debug('test')
+    tf.logging.debug('DEBUG==========test==========DEBUG')
 
     # check tfrecords data exists
     if len(glob.glob(FLAGS.training_data)) == 0:
@@ -4597,7 +4604,10 @@ def main(unused_args):
 
     # Set the seeds
     np.random.seed(FLAGS.random_seed)
-    tf.set_random_seed(FLAGS.random_seed)
+    if tfversion[0] == 1 and tfversion[1] <= 13:
+        tf.set_random_seed(FLAGS.random_seed)
+    else:
+        tf.random.set_random_seed(FLAGS.random_seed)
 
     # Use JIT XLA
     # session_config = tf.ConfigProto(log_device_placement=True)
