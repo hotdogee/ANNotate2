@@ -250,6 +250,9 @@ if __name__ == "__main__":
     # old_addition_only.tsv
     # new.fa
     # new.tsv
+    # UA: UniprotAccession
+    # SV: SequenceVersion
+    # PA: PfamAccession
     new_regions = tsv32_vocab['UA_SV_PA'] - tsv31_vocab['UA_SV_PA']
     # free memory
     del tsv31_vocab['UA_SV_PA']
@@ -257,6 +260,8 @@ if __name__ == "__main__":
     in_old = defaultdict(set)
     in_new = defaultdict(set)
     for r in new_regions:
+        # if the sequence of the new region is an old sequence
+        # and the domain is an old domain
         if r[0] in tsv31_vocab['UA_SV'] and r[1] in tsv31_vocab['PA']:
             in_old['UA_SV_PA'].add(r)
             in_old['UA_SV'].add(r[0])
