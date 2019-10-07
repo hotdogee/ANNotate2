@@ -22,6 +22,7 @@ def _gzip_size(path):
 
 
 def stats_pfam_regions_tsv(path):
+    # A0A103YDS2  1           3C510D74FCA8479C 31e3d17a0f6766e2a545214e475d72a8 PF04863   52        107
     path = Path(path)
     # if gzipped
     target = os.path.getsize(path)
