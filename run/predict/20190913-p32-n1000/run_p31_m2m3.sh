@@ -2,14 +2,14 @@
 # chmod a+x /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/run/predict/20190913-p32-n1000/*.sh
 DATADIR=/data12/datasets3
 VERSIONS=(
-# FullGru512x4_hw512_attpost_2080Ti_W2125-4.4
+# m2: FullGru512x4_hw512_attpost_2080Ti_W2125-4.4
 1568424545
 1568424552
 1568424557
 1568424563
 1568424570
 1568424576
-# FullGru512x4_hw512_attpost_highdrop_2080Ti_W2125-3.4
+# m3: FullGru512x4_hw512_attpost_highdrop_2080Ti_W2125-3.4
 1568424583
 1568424589
 1568424596

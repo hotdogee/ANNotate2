@@ -1,8 +1,8 @@
 #!/bin/bash
 DATADIR=/data12/datasets3
-# FullGru512x4_hw512_TITANV_W2125-2.4
 MODELDIR=/data12/checkpoints/pfam-regions-d0-s0/v4-BiRnn/FullGru512x4_hw512_TITANV_W2125-2.4
 VERSIONS=(
+# m1: FullGru512x4_hw512_TITANV_W2125-2.4
 1568346278
 1568346287
 1568346297

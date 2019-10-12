@@ -412,6 +412,11 @@ false_discovery_rate: {false_discovery_rate:.3%}
 #  false_omission_rate: 41.323%
 # Runtime: 62.12 s
 
+# p31_seqs_with_p32_regions_of_p31_domains.p31_results.p32_regions_perf.json
+#   "answer_positive": 222373,
+#   "true_positive": 17240,
+#   "recall": 0.07752739766068723,
+
 # Computing pfam_scan classification performance with:
 #   Prediction results: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.n100.p31_results.tsv
 #   Regions answers: Pfam32.0/p31_seqs_with_p32_regions_of_p31_domains.all_regions.n100.tsv.gz

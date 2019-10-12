@@ -283,7 +283,7 @@ if __name__ == "__main__":
             tokens = line.split()
             # assert length == 15
             assert (
-                len(tokens) == 4
+                len(tokens) == 4 or len(tokens) == 5
             ), f'pred token length: {len(tokens)}, expected: 4'
             # get seq_len
             seq_id = tokens[0]
