@@ -1,3 +1,4 @@
+# v4: Changed export type from tf.train.SequenceExample to tf.train.Example
 import os
 import sys
 import time

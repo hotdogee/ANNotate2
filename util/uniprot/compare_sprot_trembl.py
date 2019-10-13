@@ -96,9 +96,17 @@ from collections import OrderedDict
 # (blanks)	Sequence data	Once or more
 # //	Termination line	Once; ends the entry
 
-FT_KEYS = ['TRANSMEM', 'DNA_BIND', 'REPEAT', 'REGION', 'COMPBIAS', 'INTRAMEM', 'DOMAIN', 'CA_BIND', 'COILED', 'ZN_FING', 'NP_BIND', 'MOTIF', 'TOPO_DOM', 'HELIX', 'STRAND', 'TURN', 'ACT_SITE', 'METAL', 'BINDING', 'SITE', 'NON_STD', 'MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK', 'VAR_SEQ', 'VARIANT', 'MUTAGEN', 'CONFLICT', 'UNSURE', 'NON_CONS', 'NON_TER', 'INIT_MET', 'SIGNAL', 'TRANSIT', 'PROPEP', 'CHAIN', 'PEPTIDE']
+FT_KEYS = [
+    'TRANSMEM', 'DNA_BIND', 'REPEAT', 'REGION', 'COMPBIAS', 'INTRAMEM',
+    'DOMAIN', 'CA_BIND', 'COILED', 'ZN_FING', 'NP_BIND', 'MOTIF', 'TOPO_DOM',
+    'HELIX', 'STRAND', 'TURN', 'ACT_SITE', 'METAL', 'BINDING', 'SITE',
+    'NON_STD', 'MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK',
+    'VAR_SEQ', 'VARIANT', 'MUTAGEN', 'CONFLICT', 'UNSURE', 'NON_CONS',
+    'NON_TER', 'INIT_MET', 'SIGNAL', 'TRANSIT', 'PROPEP', 'CHAIN', 'PEPTIDE'
+]
 
 FT = namedtuple('FT', ['key', 'start', 'end'])
+
 
 def stats_uniprot_dat(path):
     path = Path(path)
@@ -112,9 +120,9 @@ def stats_uniprot_dat(path):
     vocab = defaultdict(set)
     count = defaultdict(int)
     id = ''
-    mp_e = 0 # Molecule processing
-    ptm_e = 0 # PTM
-    sf_e = 0 # Structure feathers
+    mp_e = 0  # Molecule processing
+    ptm_e = 0  # PTM
+    sf_e = 0  # Structure feathers
     entry = defaultdict(list)
     with f:
         for line in f:
@@ -131,7 +139,7 @@ def stats_uniprot_dat(path):
                 count[lc] += 1
                 # check overlapping features
                 for i in range(len(entry['FT'])):
-                    for j in range(i+1, len(entry['FT'])):
+                    for j in range(i + 1, len(entry['FT'])):
                         f1 = entry['FT'][i]
                         f2 = entry['FT'][j]
                         if f2.start <= f1.end and f2.end >= f1.start:
@@ -175,7 +183,6 @@ def stats_uniprot_dat(path):
     return vocab, count, overlap
 
 
-
 def verify_input_path(p):
     # get absolute path to dataset directory
     path = Path(os.path.abspath(os.path.expanduser(p)))
@@ -187,24 +194,38 @@ def verify_input_path(p):
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
     return path
 
+
 def print_set_stats(n1, s1, n2, s2, unit=''):
-    print(f'''
+    print(
+        f'''
 {n1}: {len(s1)} {unit}
 {n2}: {len(s2)} {unit}
 {n1} & {n2}: {len(s1 & s2)} {unit}
 {n1} | {n2}: {len(s1 | s2)} {unit}
 {n1} - {n2}: {len(s1 - s2)} {unit}
 {n2} - {n1}: {len(s2 - s1)} {unit}
-''')
+'''
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Print the differences of two uniprot dat.gz files.')
-    parser.add_argument('-s', '--sprot', type=str, required=True,
-        help="Path to uniprot_sprot.dat.gz file, required.")
-    parser.add_argument('-t', '--trembl', type=str, required=True,
-        help="Path to uniprot_trembl.dat.gz file, required.")
+        description='Print the differences of two uniprot dat.gz files.'
+    )
+    parser.add_argument(
+        '-s',
+        '--sprot',
+        type=str,
+        required=True,
+        help="Path to uniprot_sprot.dat.gz file, required."
+    )
+    parser.add_argument(
+        '-t',
+        '--trembl',
+        type=str,
+        required=True,
+        help="Path to uniprot_trembl.dat.gz file, required."
+    )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
@@ -223,8 +244,11 @@ if __name__ == "__main__":
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
 
-# Comparing: uniprot_sprot.dat.gz and uniprot_trembl.dat.gz==ID set stats==
+# Swiss-Prot (created in 1986) is a high quality manually annotated and non-redundant protein sequence database, which brings together experimental results, computed features and scientific conclusions. UniProtKB/Swiss-Prot is now the reviewed section of the UniProt Knowledgebase.
+# The TrEMBL section of UniProtKB was introduced in 1996 in response to the increased dataflow resulting from genome projects. It was already recognized at that time that the traditional time- and labour-intensive manual curation process which is the hallmark of Swiss-Prot could not be broadened to encompass all available protein sequences. UniProtKB/TrEMBL contains high quality computationally analyzed records that are enriched with automatic annotation and classification. These UniProtKB/TrEMBL unreviewed entries are kept separated from the UniProtKB/Swiss-Prot manually reviewed entries so that the high quality data of the latter is not diluted in any way. Automatic processing of the data enables the records to be made available to the public quickly.
 
+# Comparing: uniprot_sprot.dat.gz and uniprot_trembl.dat.gz
+# ==ID set stats==
 # sprot: 559077
 # trembl: 139694261
 # sprot & trembl: 0
@@ -233,7 +257,6 @@ if __name__ == "__main__":
 # trembl - sprot: 139694261
 
 # ==AC set stats==
-
 # sprot: 774874
 # trembl: 140179159
 # sprot & trembl: 0
