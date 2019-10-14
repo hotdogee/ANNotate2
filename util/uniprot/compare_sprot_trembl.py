@@ -10,6 +10,8 @@ from collections import defaultdict
 from collections import namedtuple
 from collections import OrderedDict
 
+# Download: ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete
+
 # windows
 # python .\util\uniprot\compare_sprot_trembl.py --sprot D:/uniprot/uniprot-20190211/uniprot_sprot.dat.gz --trembl D:/uniprot/uniprot-20190211/uniprot_trembl.dat.gz
 

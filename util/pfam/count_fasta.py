@@ -50,7 +50,11 @@ def _fa_gz_to_list(fa_path):
     seq_len, seq_entry = 0, ''
     # current = 0
     with f as fa_f, tqdm(
-        total=target, unit='bytes', dynamic_ncols=True, ascii=True
+        total=target,
+        unit='bytes',
+        dynamic_ncols=True,
+        ascii=True,
+        desc=path.name
     ) as t:
         for line in fa_f:
             t.update(len(line))

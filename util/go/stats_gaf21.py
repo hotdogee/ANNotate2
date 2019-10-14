@@ -12,7 +12,6 @@ from collections import defaultdict
 # python .\util\go\stats_gaf21.py --gaf D:/go/goa/UNIPROT/goa_uniprot_all.gaf.gz
 # python .\util\go\stats_gaf21.py --gaf D:/go/goa/UNIPROT/goa_uniprot_gcrp.gaf.gz
 
-
 # GAF2.1 files have the suffix .gaf and contain the following columns:
 # 	Column  Contents
 # 	1       DB
@@ -32,6 +31,7 @@ from collections import defaultdict
 # 	15      Assigned_By
 # 	16      Annotation_Extension
 # 	17      Gene_Product_Form_ID
+
 
 def stats_gaf(path):
     path = Path(path)
@@ -90,7 +90,9 @@ def stats_gaf(path):
                     no_iea_vocab['tax'].add(line[12].strip())
                     if line[3].strip() != '':
                         no_iea_count[line[3].strip()] += 1
-                    if line[6].strip() in ['EXP', 'IDA', 'IPI', 'IMP', 'IGI', 'IEP']:
+                    if line[6].strip() in [
+                        'EXP', 'IDA', 'IPI', 'IMP', 'IGI', 'IEP'
+                    ]:
                         exp_only_vocab['db'].add(line[0].strip())
                         exp_only_vocab['seqid'].add(line[1].strip())
                         exp_only_vocab['symbol'].add(line[2].strip())
@@ -103,14 +105,18 @@ def stats_gaf(path):
                             exp_only_count[line[3].strip()] += 1
     return count, vocab, protein_count, protein_vocab, no_iea_count, no_iea_vocab, exp_only_count, exp_only_vocab
 
+
 def print_vocab(vocab):
-    print(f'''
+    print(
+        f'''
 db: {vocab['db']}
 qual: {vocab['qual']}
 evidence: {vocab['evidence']}
 type: {vocab['type']}
-''')
-    print(f'''
+'''
+    )
+    print(
+        f'''
 db: {len(vocab['db'])}
 seqid: {len(vocab['seqid'])}
 symbol: {len(vocab['symbol'])}
@@ -119,13 +125,21 @@ go: {len(vocab['go'])}
 evidence: {len(vocab['evidence'])}
 type: {len(vocab['type'])}
 tax: {len(vocab['tax'])}
-''')
+'''
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Print some statistics of the GO .gaf.gz file.')
-    parser.add_argument('-g', '--gaf', type=str, required=True,
-        help="Path to .gaf.gz file, required.")
+        description='Print some statistics of the GO .gaf.gz file.'
+    )
+    parser.add_argument(
+        '-g',
+        '--gaf',
+        type=str,
+        required=True,
+        help="Path to .gaf.gz file, required."
+    )
 
     args, unparsed = parser.parse_known_args()
     # print(f'GAF: {args.gaf}\n')
@@ -138,13 +152,19 @@ if __name__ == "__main__":
 
     # doesn't exist
     if not gaf_path.exists():
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), gaf_path)
+        raise FileNotFoundError(
+            errno.ENOENT, os.strerror(errno.ENOENT), gaf_path
+        )
     # is dir
     if gaf_path.is_dir():
-        raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), gaf_path)
+        raise IsADirectoryError(
+            errno.EISDIR, os.strerror(errno.EISDIR), gaf_path
+        )
     print(f'Processing: {gaf_path}')
 
-    count, vocab, protein_count, protein_vocab, no_iea_count, no_iea_vocab, exp_only_count, exp_only_vocab = stats_gaf(gaf_path)
+    count, vocab, protein_count, protein_vocab, no_iea_count, no_iea_vocab, exp_only_count, exp_only_vocab = stats_gaf(
+        gaf_path
+    )
     print('==ALL==')
     print_vocab(vocab)
     print('==QUAL COUNT==')
@@ -168,13 +188,18 @@ if __name__ == "__main__":
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
 
+# goa_uniprot_all.[gaf|gpa]
+# This set contains all GO annotations for proteins in the UniProt KnowledgeBase (UniProtKB) and for entities other than proteins, e.g. macromolecular complexes (Complex Portal identifiers) or RNAs (RNAcentral identifiers).
+
+# goa_uniprot_gcrp.[gaf|gpa]
+# This set contains all GO annotations for canonical accessions from the UniProt reference proteomes for all species, which provide one protein per gene. The reference proteomes comprise the protein sequences annotated in Swiss-Prot or the longest TrEMBL transcript if there is no Swiss-Prot record.
+
 # goa_uniprot_gcrp.gaf
 
 # db: {'UniProtKB'}
 # qual: {'', 'contributes_to', 'NOT|colocalizes_with', 'NOT', 'NOT|contributes_to', 'colocalizes_with'}
 # evidence: {'IKR', 'HDA', 'RCA', 'IBA', 'IPI', 'HMP', 'IEP', 'HGI', 'IDA', 'HEP', 'ISA', 'IC', 'ISO', 'EXP', 'IGC', 'IEA', 'NAS', 'IMP', 'TAS', 'ISM', 'ND', 'ISS', 'IGI'}
 # type: {'protein'}
-
 
 # db: 1
 # seqid: 23582588
@@ -230,7 +255,6 @@ if __name__ == "__main__":
 # type: {'transcript', 'RNase_MRP_RNA', 'tmRNA', 'antisense_RNA', 'autocatalytically_spliced_intron', 'rRNA', 'lnc_RNA', 'scRNA',
 # 'vault_RNA', 'telomerase_RNA', 'tRNA', 'hammerhead_ribozyme', 'siRNA', 'ribozyme', 'primary_transcript', 'piRNA', 'Y_RNA', 'snoRNA', 'snRNA', 'protein', 'miRNA', 'ncRNA', 'protein_complex', 'SRP_RNA', 'RNase_P_RNA', 'guide_RNA'}
 
-
 # db: 3
 # seqid: 102989625
 # symbol: 75301818
@@ -252,7 +276,6 @@ if __name__ == "__main__":
 # qual: {'', 'colocalizes_with', 'NOT', 'contributes_to', 'NOT|contributes_to', 'NOT|colocalizes_with'}
 # evidence: {'HMP', 'ND', 'TAS', 'ISS', 'ISM', 'NAS', 'IDA', 'RCA', 'IGI', 'HDA', 'HGI', 'IBA', 'IEP', 'EXP', 'HEP', 'IEA', 'IPI', 'IKR', 'IMP', 'IGC', 'ISO', 'IC', 'ISA'}
 # type: {'protein'}
-
 
 # db: 1
 # seqid: 96293088
@@ -276,7 +299,6 @@ if __name__ == "__main__":
 # evidence: {'HMP', 'ND', 'TAS', 'ISS', 'ISM', 'NAS', 'IDA', 'RCA', 'IGI', 'HDA', 'HGI', 'IBA', 'IEP', 'EXP', 'HEP', 'IPI', 'IKR', 'IMP', 'IGC', 'ISO', 'IC', 'ISA'}
 # type: {'protein'}
 
-
 # db: 1
 # seqid: 755728
 # symbol: 533011
@@ -298,7 +320,6 @@ if __name__ == "__main__":
 # qual: {'', 'colocalizes_with', 'NOT', 'contributes_to', 'NOT|contributes_to', 'NOT|colocalizes_with'}
 # evidence: {'IDA', 'IGI', 'IPI', 'IMP', 'IEP', 'EXP'}
 # type: {'protein'}
-
 
 # db: 1
 # seqid: 123585
@@ -326,7 +347,6 @@ if __name__ == "__main__":
 # 'IPI', 'ISA', 'ISS', 'HEP', 'IKR', 'IDA'}
 # type: {'protein'}
 
-
 # db: 1
 # seqid: 23582588
 # symbol: 18832370
@@ -349,7 +369,6 @@ if __name__ == "__main__":
 # evidence: {'ND', 'IGI', 'EXP', 'TAS', 'HMP', 'NAS', 'IEA', 'HDA', 'IGC', 'RCA', 'IBA', 'IMP', 'HGI', 'IEP', 'IC', 'ISO', 'ISM',
 # 'IPI', 'ISA', 'ISS', 'HEP', 'IKR', 'IDA'}
 # type: {'protein'}
-
 
 # db: 1
 # seqid: 23582588
@@ -374,7 +393,6 @@ if __name__ == "__main__":
 # 'ISA', 'ISS', 'HEP', 'IKR', 'IDA'}
 # type: {'protein'}
 
-
 # db: 1
 # seqid: 652694
 # symbol: 501094
@@ -396,7 +414,6 @@ if __name__ == "__main__":
 # qual: {'', 'NOT|colocalizes_with', 'NOT|contributes_to', 'NOT', 'contributes_to', 'colocalizes_with'}
 # evidence: {'IMP', 'IGI', 'EXP', 'IEP', 'IPI', 'IDA'}
 # type: {'protein'}
-
 
 # db: 1
 # seqid: 88128
