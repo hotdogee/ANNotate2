@@ -223,7 +223,9 @@ if __name__ == "__main__":
         f = path.open(mode='r', encoding='utf-8')
     # initialize
     line_num = 0
+    annotation_count = 0
     missing_seqids = set()
+    seqids_count = set()
     missing_max = 10
     with f, tqdm(
         total=target,
@@ -244,7 +246,18 @@ if __name__ == "__main__":
                 continue
             # line code
             tokens = line.split('\t')
+            DB_Object_Type = tokens[11].strip()
+            if DB_Object_Type != 'protein':
+                continue
+            evidence = tokens[6].strip()
+            if evidence == 'IEA':
+                continue
+            qualifier = tokens[3].strip()
+            if qualifier[:3] == 'NOT':
+                continue
             seqid = tokens[1].strip().split(':')[0]
+            if seqid[-2:] == '-1':
+                seqid = seqid[:-2]
             if seqid not in vocab2['seqid'] and seqid not in vocab3[
                 'seqid'
             ] and seqid not in vocab4['seqid'] and seqid not in missing_seqids:
@@ -255,7 +268,13 @@ if __name__ == "__main__":
                     f'line {line_num}: "{seqid}" not found in {fa2_path.name}'
                 )
                 print(line)
-
+            else:
+                annotation_count += 1
+                seqids_count.add(seqid)
+    print(missing_seqids)
+    print(f'Missing Seqs: {len(missing_seqids)}')
+    print(f'Seqs: {len(seqids_count)}')
+    print(f'Annotations: {annotation_count}')
     print(f'Runtime: {time.time() - start_time:.2f} s\n')
 
 # windows
@@ -264,3 +283,12 @@ if __name__ == "__main__":
 # python util/go/print_missing_seqids.py --gaf1 /data12/goa/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20190211/uniprot_trembl.fasta
 # python util/go/print_missing_seqids.py --gaf1 /data12/goa/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20190211/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20190211/uniprot_sprot.fasta
 # python util/go/print_missing_seqids.py --gaf1 /data12/goa/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20190211/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20190211/uniprot_sprot.fasta --fa4 /data12/uniprot/uniprot-20191015/uniprot_sprot_varsplic.fasta
+
+# Processed 989314744 lines in uniprot_trembl.fasta
+# Processed 4185641 lines in uniprot_sprot.fasta
+# Processed 460102 lines in uniprot_sprot_varsplic.fasta
+# {'P14270-5', 'O95718-3', 'P14270-33', 'O15553-2', 'O43889-2', 'D3ZHK8-2', 'P12003-2', 'P14270-31', 'O60936-2', 'D3ZHK8-3', 'P10070-5'}
+# Missing Seqs: 11
+# Seqs: 88927579
+# Annotations: 545121515
+# Runtime: 1915.25 s

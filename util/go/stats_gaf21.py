@@ -292,6 +292,8 @@ if __name__ == "__main__":
 # colocalizes_with: 15928
 # NOT|colocalizes_with: 37
 # NOT|contributes_to: 4
+
+# ‘Electronic’ (IEA) annotation are not manually reviewed
 # ==EXCLUDE IEA==
 
 # db: {'UniProtKB'}
@@ -385,6 +387,8 @@ if __name__ == "__main__":
 # colocalizes_with: 13114
 # NOT|colocalizes_with: 32
 # NOT|contributes_to: 4
+
+# ‘Electronic’ (IEA) annotation are not manually reviewed
 # ==EXCLUDE IEA==
 
 # db: {'UniProtKB'}
