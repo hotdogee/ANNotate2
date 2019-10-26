@@ -37,14 +37,15 @@ from pathlib import Path
 import colorama
 from colorama import Fore, Back, Style
 # print(Fore.RED + 'some red text2' + Style.RESET_ALL, file=sys.stderr)
-colorama.init() # this needs to run before first run of tf_logging._get_logger()
+colorama.init(
+)  # this needs to run before first run of tf_logging._get_logger()
 # print(Fore.RED + 'some red text3' + Style.RESET_ALL, file=sys.stderr)
 import tensorflow as tf
 # print(Fore.RED + 'some red text4' + Style.RESET_ALL, file=sys.stderr)
 from tensorflow.python.ops import variables, inplace_ops
 from tensorflow.python.data.ops import iterator_ops
 # from tensorflow.contrib.data.python.ops.iterator_ops import _Saveable # 1.11
-from tensorflow.python.data.experimental.ops.iterator_ops import _Saveable # 1.12
+from tensorflow.python.data.experimental.ops.iterator_ops import _Saveable  # 1.12
 from tensorflow.core.util.event_pb2 import SessionLog
 from tensorflow.python.training import training_util
 from tensorflow.python.framework import meta_graph
@@ -63,11 +64,14 @@ _NEG_INF = -1e9
 
 tfversion = tuple([int(s) for s in tf.__version__.split('-')[0].split('.')])
 
+
 class TqdmFile(object):
     """ A file-like object that will write to tqdm"""
     file = None
+
     def __init__(self, file):
         self.file = file
+
     def write(self, x):
         # Avoid print() second call (useless \n)
         if len(x.rstrip()) > 0:
@@ -76,8 +80,10 @@ class TqdmFile(object):
                 tqdm.write(x, file=self.file)
             else:
                 tqdm.write(x.rstrip(), file=self.file)
+
     def flush(self):
         return getattr(self.file, "flush", lambda: None)()
+
 
 # Disable cpp warnings
 # os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
@@ -89,24 +95,35 @@ FLAGS = None
 aa_list = ' FLIMVPAWGSTYQNCO*UHKRDEBZX-'
 aa_index = dict(zip(aa_list, range(len(aa_list))))
 
+
 def pad_to_multiples(features, labels, pad_to_mutiples_of=8, padding_values=0):
     """Nvidia Volta Tensor Cores are enabled when data shape is multiples of 8
     """
     # tf.Tensor: shape=(batch_size, padded_size), dtype=float32
     max_len = tf.shape(features['protein'])[1]
-    target_len = tf.cast(tf.multiply(tf.ceil(tf.truediv(max_len, pad_to_mutiples_of)), pad_to_mutiples_of), tf.int32)
+    target_len = tf.cast(
+        tf.multiply(
+            tf.ceil(tf.truediv(max_len, pad_to_mutiples_of)), pad_to_mutiples_of
+        ), tf.int32
+    )
     paddings = [[0, 0], [0, target_len - max_len]]
-    features['protein'] = tf.pad(tensor=features['protein'], paddings=paddings, constant_values=padding_values)
+    features['protein'] = tf.pad(
+        tensor=features['protein'],
+        paddings=paddings,
+        constant_values=padding_values
+    )
     return features, labels
 
 
-def bucket_by_sequence_length_and_pad_to_multiples(element_length_func,
-                                                   bucket_boundaries,
-                                                   bucket_batch_sizes,
-                                                   padded_shapes=None,
-                                                   padding_values=None,
-                                                   pad_to_mutiples_of=None,
-                                                   pad_to_bucket_boundary=False):
+def bucket_by_sequence_length_and_pad_to_multiples(
+    element_length_func,
+    bucket_boundaries,
+    bucket_batch_sizes,
+    padded_shapes=None,
+    padding_values=None,
+    pad_to_mutiples_of=None,
+    pad_to_bucket_boundary=False
+):
     """A transformation that buckets elements in a `Dataset` by length.
 
     Nvidia Volta Tensor Cores are enabled when data shape is multiples of 8
@@ -147,7 +164,8 @@ def bucket_by_sequence_length_and_pad_to_multiples(element_length_func,
     with tf.name_scope("bucket_by_sequence_length_and_pad_to_multiples"):
         if len(bucket_batch_sizes) != (len(bucket_boundaries) + 1):
             raise ValueError(
-                "len(bucket_batch_sizes) must equal len(bucket_boundaries) + 1")
+                "len(bucket_batch_sizes) must equal len(bucket_boundaries) + 1"
+            )
 
         batch_sizes = tf.constant(bucket_batch_sizes, dtype=tf.int64)
 
@@ -160,7 +178,8 @@ def bucket_by_sequence_length_and_pad_to_multiples(element_length_func,
             buckets_max = boundaries + [np.iinfo(np.int32).max]
             conditions_c = tf.logical_and(
                 tf.less_equal(buckets_min, seq_length),
-                tf.less(seq_length, buckets_max))
+                tf.less(seq_length, buckets_max)
+            )
             bucket_id = tf.reduce_min(tf.where(conditions_c))
 
             return bucket_id
@@ -177,10 +196,7 @@ def bucket_by_sequence_length_and_pad_to_multiples(element_length_func,
                 # print('shape', shape)
                 shape = tf.TensorShape(shape)
                 # print(tf.TensorShape(None))
-                shape = [
-                    none_filler if d.value is None else d
-                    for d in shape
-                ]
+                shape = [none_filler if d.value is None else d for d in shape]
                 # print(shape)
                 padded.append(shape)
             return nest.pack_sequence_as(shapes, padded)
@@ -192,28 +208,36 @@ def bucket_by_sequence_length_and_pad_to_multiples(element_length_func,
             batch_size = batch_sizes[bucket_id]
             none_filler = None
             if pad_to_bucket_boundary:
-                err_msg = ("When pad_to_bucket_boundary=True, elements must have "
-                           "length <= max(bucket_boundaries).")
+                err_msg = (
+                    "When pad_to_bucket_boundary=True, elements must have "
+                    "length <= max(bucket_boundaries)."
+                )
                 check = tf.assert_less(
                     bucket_id,
-                    tf.constant(len(bucket_batch_sizes) - 1,
-                                dtype=tf.int64),
-                    message=err_msg)
+                    tf.constant(len(bucket_batch_sizes) - 1, dtype=tf.int64),
+                    message=err_msg
+                )
                 with tf.control_dependencies([check]):
-                    boundaries = tf.constant(bucket_boundaries,
-                                             dtype=tf.int64)
+                    boundaries = tf.constant(bucket_boundaries, dtype=tf.int64)
                     bucket_boundary = boundaries[bucket_id]
                     none_filler = bucket_boundary
             # print(padded_shapes or grouped_dataset.output_shapes)
             shapes = make_padded_shapes(
                 padded_shapes or grouped_dataset.output_shapes,
-                none_filler=none_filler)
-            return grouped_dataset.padded_batch(batch_size, shapes, padding_values)
+                none_filler=none_filler
+            )
+            return grouped_dataset.padded_batch(
+                batch_size, shapes, padding_values
+            )
 
         def _apply_fn(dataset):
             return dataset.apply(
-                tf.contrib.data.group_by_window(element_to_bucket_id, batching_fn,
-                                                window_size_func=window_size_fn))
+                tf.contrib.data.group_by_window(
+                    element_to_bucket_id,
+                    batching_fn,
+                    window_size_func=window_size_fn
+                )
+            )
 
         return _apply_fn
 
@@ -225,8 +249,12 @@ def parse_sequence_example(serialized, mode):
     }
     if mode != tf.estimator.ModeKeys.PREDICT:
         sequence_features = {
-            'protein': tf.FixedLenSequenceFeature([], dtype=tf.string),
-            'domains': tf.FixedLenSequenceFeature([], dtype=tf.string, allow_missing=True)
+            'protein':
+                tf.FixedLenSequenceFeature([], dtype=tf.string),
+            'domains':
+                tf.FixedLenSequenceFeature(
+                    [], dtype=tf.string, allow_missing=True
+                )
         }
     else:
         sequence_features = {
@@ -259,9 +287,7 @@ def parse_sequence_example(serialized, mode):
     )
     # tf.Tensor: shape=(sequence_length, 1), dtype=uint8
     sequence['protein'] = tf.cast(
-        x=sequence['protein'],
-        dtype=tf.int32,
-        name=None
+        x=sequence['protein'], dtype=tf.int32, name=None
     )
     # embedding_lookup expects int32 or int64
     # tf.Tensor: shape=(sequence_length, 1), dtype=int32
@@ -277,9 +303,7 @@ def parse_sequence_example(serialized, mode):
     # tf.Tensor: shape=(sequence_length, ), dtype=int32
     # protein = tf.one_hot(protein, params.vocab_size)
     sequence['lengths'] = tf.shape(
-        input=sequence['protein'],
-        name=None,
-        out_type=tf.int32
+        input=sequence['protein'], name=None, out_type=tf.int32
     )[0]
     if mode != tf.estimator.ModeKeys.PREDICT:
         domains = tf.decode_raw(sequence['domains'], out_type=tf.uint16)
@@ -304,9 +328,7 @@ def parse_example(serialized, mode):
             'go': tf.FixedLenFeature(shape=(), dtype=tf.string)
         }
     else:
-        features = {
-            'protein': tf.FixedLenFeature(shape=(), dtype=tf.string)
-        }
+        features = {'protein': tf.FixedLenFeature(shape=(), dtype=tf.string)}
     parsed = tf.parse_single_example(
         serialized=serialized,
         # A scalar (0-D Tensor) of type string, a single binary
@@ -320,24 +342,15 @@ def parse_example(serialized, mode):
         # A name for this operation (optional).
     )
     parsed['protein'] = tf.decode_raw(
-        parsed['protein'],
-        out_type=tf.uint8,
-        little_endian=True,
-        name=None
+        parsed['protein'], out_type=tf.uint8, little_endian=True, name=None
     )
     # tf.Tensor: shape=(sequence_length,), dtype=uint8
-    parsed['protein'] = tf.cast(
-        x=parsed['protein'],
-        dtype=tf.int32,
-        name=None
-    )
+    parsed['protein'] = tf.cast(x=parsed['protein'], dtype=tf.int32, name=None)
     # embedding_lookup expects int32 or int64
     # tf.Tensor: shape=(sequence_length,), dtype=int32
     # protein = tf.one_hot(protein, params.vocab_size)
     parsed['lengths'] = tf.shape(
-        input=parsed['protein'],
-        name=None,
-        out_type=tf.int32
+        input=parsed['protein'], name=None, out_type=tf.int32
     )[0]
     if mode != tf.estimator.ModeKeys.PREDICT:
         go = tf.decode_raw(parsed['go'], out_type=tf.uint8)
@@ -402,12 +415,14 @@ def input_fn(mode, params, config):
 
     if mode == tf.estimator.ModeKeys.TRAIN:
         if tfversion[0] == 1 and tfversion[1] <= 13:
-            dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(
-                buffer_size=params.shuffle_buffer,
-                # the maximum number elements that will be buffered when prefetching.
-                count=params.repeat_count
-                # the number of times the dataset should be repeated
-            ))
+            dataset = dataset.apply(
+                tf.contrib.data.shuffle_and_repeat(
+                    buffer_size=params.shuffle_buffer,
+                    # the maximum number elements that will be buffered when prefetching.
+                    count=params.repeat_count
+                    # the number of times the dataset should be repeated
+                )
+            )
         else:
             dataset = dataset.shuffle(buffer_size=params.shuffle_buffer)
             if params.repeat_count != 1:
@@ -444,19 +459,30 @@ def input_fn(mode, params, config):
 
     # Our inputs are variable length, so bucket, dynamic batch and pad them.
     if mode != tf.estimator.ModeKeys.PREDICT:
-        padded_shapes = ({'protein': [None], 'lengths': []}, [params.num_classes])
+        padded_shapes = (
+            {
+                'protein': [None],
+                'lengths': []
+            }, [params.num_classes]
+        )
     else:
         padded_shapes = {'protein': [None], 'lengths': []}
 
-    dataset = dataset.apply(tf.data.experimental.bucket_by_sequence_length(
-        element_length_func=lambda seq, dom: seq['lengths'],
-        bucket_boundaries=[2 ** x for x in range(5, 15)], # 32 ~ 16384
-        bucket_batch_sizes=[params.batch_size * 2 ** x for x in range(10, -1, -1)], # 1024 ~ 1
-        padded_shapes=padded_shapes,
-        padding_values=None, # Defaults to padding with 0.
-        pad_to_bucket_boundary=False
-    )).map(
-        functools.partial(pad_to_multiples, pad_to_mutiples_of=8, padding_values=0),
+    dataset = dataset.apply(
+        tf.data.experimental.bucket_by_sequence_length(
+            element_length_func=lambda seq, dom: seq['lengths'],
+            bucket_boundaries=[2**x for x in range(5, 15)],  # 32 ~ 16384
+            bucket_batch_sizes=[
+                params.batch_size * 2**x for x in range(10, -1, -1)
+            ],  # 1024 ~ 1
+            padded_shapes=padded_shapes,
+            padding_values=None,  # Defaults to padding with 0.
+            pad_to_bucket_boundary=False
+        )
+    ).map(
+        functools.partial(
+            pad_to_multiples, pad_to_mutiples_of=8, padding_values=0
+        ),
         num_parallel_calls=int(params.num_cpu_threads / 2)
     )
 
@@ -497,7 +523,10 @@ def debug_serving():
     import numpy as np
     protein_strs = tf.constant(['FLI', 'MVPA', 'GS'])
     # <tf.Tensor: id=440, shape=(3,), dtype=string, numpy=array([b'FLI', b'MVPA', b'GS'], dtype=object)>
-    proteins = [[aa_index[a] for a in np.array(ps).tolist().decode('utf-8')] for ps in protein_strs]
+    proteins = [
+        [aa_index[a] for a in np.array(ps).tolist().decode('utf-8')]
+        for ps in protein_strs
+    ]
     proteins = [[1, 2, 3], [4, 5, 1, 6], [1, 2]]
     np_proteins = [np.array(p, dtype=np.uint8) for p in proteins]
 
@@ -537,7 +566,9 @@ def debug_serving():
     #     }
     # }
     # serialized = make_sequence_example(np_proteins[0]).SerializeToString()
-    serialized = [make_sequence_example(npp).SerializeToString() for npp in np_proteins]
+    serialized = [
+        make_sequence_example(npp).SerializeToString() for npp in np_proteins
+    ]
     # b'\x12"\n \n\x07protein\x12\x15\n\x05\n\x03\n\x01\x01\n\x05\n\x03\n\x01\x02\n\x05\n\x03\n\x01\x03'
     context_features = {
         # 'length': tf.FixedLenFeature([], dtype=tf.int64)
@@ -574,8 +605,16 @@ def debug_serving():
     # lengths = {'protein': <tf.Tensor: id=4, shape=(3,), dtype=int64, numpy=array([3, 4, 2], dtype=int64)>})
     mode = tf.estimator.ModeKeys.PREDICT
     dataset = tf.data.Dataset.from_tensor_slices(serialized)
-    dataset = dataset.map(functools.partial(parse_sequence_example, mode=mode), num_parallel_calls=None)
-    dataset = dataset.padded_batch(batch_size=10, padded_shapes={'protein': [None], 'lengths': []})
+    dataset = dataset.map(
+        functools.partial(parse_sequence_example, mode=mode),
+        num_parallel_calls=None
+    )
+    dataset = dataset.padded_batch(
+        batch_size=10, padded_shapes={
+            'protein': [None],
+            'lengths': []
+        }
+    )
     sequences = tf.data.experimental.get_single_element(dataset)
     # sequences = {'protein': <tf.Tensor: id=328, shape=(3, 4), dtype=int32, numpy=
     # array([[1, 2, 3, 0],
@@ -584,44 +623,44 @@ def debug_serving():
     iterator = tfe.Iterator(dataset)
     print(iterator.next())
 
-    decoded = [tf.decode_raw(
-        bytes=x,
-        out_type=tf.uint8,
-        little_endian=True,
-        name=None
-    ) for x in sequence['protein']]
+    decoded = [
+        tf.decode_raw(
+            bytes=x, out_type=tf.uint8, little_endian=True, name=None
+        ) for x in sequence['protein']
+    ]
 
 
 def make_sequence(protein):
     sequence = {}
-    sequence['protein'] = tf.cast(
-        x=protein,
-        dtype=tf.int32,
-        name=None
-    )
-    sequence['lengths'] = tf.shape(
-        input=protein,
-        name=None,
-        out_type=tf.int32
-    )[0]
+    sequence['protein'] = tf.cast(x=protein, dtype=tf.int32, name=None)
+    sequence['lengths'] = tf.shape(input=protein, name=None,
+                                   out_type=tf.int32)[0]
     return sequence
+
 
 def serving_input_str_receiver_fn():
     """An input receiver that expects a serialized tf.SequenceExample."""
     serialized = tf.placeholder(
-        dtype=tf.string,
-        shape=[None],
-        name='input_protein_string_tensor'
+        dtype=tf.string, shape=[None], name='input_protein_string_tensor'
     )
     mapping = tf.constant([x for x in aa_list])
-    table = tf.contrib.lookup.index_table_from_tensor(mapping=mapping, num_oov_buckets=1, default_value=-1)
+    table = tf.contrib.lookup.index_table_from_tensor(
+        mapping=mapping, num_oov_buckets=1, default_value=-1
+    )
     receiver_tensors = {'protein_sequences': serialized}
     mode = tf.estimator.ModeKeys.PREDICT
     dataset = tf.data.Dataset.from_tensor_slices(serialized)
-    dataset = dataset.map(lambda x: table.lookup(tf.string_split([x], delimiter="").values))
+    dataset = dataset.map(
+        lambda x: table.lookup(tf.string_split([x], delimiter="").values)
+    )
     dataset = dataset.map(make_sequence)
     # dataset = dataset.map(functools.partial(parse_sequence_example, mode=mode))
-    dataset = dataset.padded_batch(batch_size=1000000, padded_shapes={'protein': [None], 'lengths': []})
+    dataset = dataset.padded_batch(
+        batch_size=1000000, padded_shapes={
+            'protein': [None],
+            'lengths': []
+        }
+    )
     sequences = tf.data.experimental.get_single_element(dataset)
     return tf.estimator.export.ServingInputReceiver(sequences, receiver_tensors)
 
@@ -629,28 +668,40 @@ def serving_input_str_receiver_fn():
 def serving_input_dataset_receiver_fn():
     """An input receiver that expects a serialized tf.SequenceExample."""
     serialized = tf.placeholder(
-        dtype=tf.string,
-        shape=[None],
-        name='input_example_tensor'
+        dtype=tf.string, shape=[None], name='input_example_tensor'
     )
-    print_op = tf.print("serialized:", serialized, serialized[0].dtype, output_stream=sys.stderr)
+    print_op = tf.print(
+        "serialized:",
+        serialized,
+        serialized[0].dtype,
+        output_stream=sys.stderr
+    )
     # tf.logging.info("serialized:", serialized, type(serialized[0]))
     receiver_tensors = {'sequences': serialized}
     mode = tf.estimator.ModeKeys.PREDICT
     with tf.control_dependencies([print_op]):
         dataset = tf.data.Dataset.from_tensor_slices(serialized)
-        dataset = dataset.map(functools.partial(parse_sequence_example, mode=mode), num_parallel_calls=None)
-        dataset = dataset.padded_batch(batch_size=1000000, padded_shapes={'protein': [None], 'lengths': []})
+        dataset = dataset.map(
+            functools.partial(parse_sequence_example, mode=mode),
+            num_parallel_calls=None
+        )
+        dataset = dataset.padded_batch(
+            batch_size=1000000,
+            padded_shapes={
+                'protein': [None],
+                'lengths': []
+            }
+        )
         sequences = tf.data.experimental.get_single_element(dataset)
-        return tf.estimator.export.ServingInputReceiver(sequences, receiver_tensors)
+        return tf.estimator.export.ServingInputReceiver(
+            sequences, receiver_tensors
+        )
 
 
 def serving_input_receiver_fn():
     """An input receiver that expects a serialized tf.SequenceExample."""
     serialized = tf.placeholder(
-        dtype=tf.string,
-        shape=[None],
-        name='input_example_tensor'
+        dtype=tf.string, shape=[None], name='input_example_tensor'
     )
     receiver_tensors = {'sequences': serialized}
     context_features = {
@@ -686,9 +737,7 @@ def serving_input_receiver_fn():
     )
     # tf.Tensor: shape=(sequence_length, 1), dtype=uint8
     sequence['protein'] = tf.cast(
-        x=sequence['protein'],
-        dtype=tf.int32,
-        name=None
+        x=sequence['protein'], dtype=tf.int32, name=None
     )
     # embedding_lookup expects int32 or int64
     # tf.Tensor: shape=(sequence_length, 1), dtype=int32
@@ -707,43 +756,50 @@ def serving_input_receiver_fn():
     sequence['lengths'] = lengths['protein']
     return tf.estimator.export.ServingInputReceiver(sequence, receiver_tensors)
 
+
 class EpochCheckpointInputPipelineHookSaver(tf.train.Saver):
-  """`Saver` with a different default `latest_filename`.
+    """`Saver` with a different default `latest_filename`.
 
   This is used in the `CheckpointInputPipelineHook` to avoid conflicts with
   the model ckpt saved by the `CheckpointSaverHook`.
   """
-
-  def __init__(self,
-               var_list,
-               latest_filename,
-               sharded=False,
-               max_to_keep=5,
-               keep_checkpoint_every_n_hours=10000.0,
-               defer_build=False,
-               save_relative_paths=True):
-    super(EpochCheckpointInputPipelineHookSaver, self).__init__(
+    def __init__(
+        self,
         var_list,
-        sharded=sharded,
-        max_to_keep=max_to_keep,
-        keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours,
-        defer_build=defer_build,
-        save_relative_paths=save_relative_paths
-    )
-    self._latest_filename = latest_filename
+        latest_filename,
+        sharded=False,
+        max_to_keep=5,
+        keep_checkpoint_every_n_hours=10000.0,
+        defer_build=False,
+        save_relative_paths=True
+    ):
+        super(EpochCheckpointInputPipelineHookSaver, self).__init__(
+            var_list,
+            sharded=sharded,
+            max_to_keep=max_to_keep,
+            keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours,
+            defer_build=defer_build,
+            save_relative_paths=save_relative_paths
+        )
+        self._latest_filename = latest_filename
 
-  def save(self,
-           sess,
-           save_path,
-           global_step=None,
-           latest_filename=None,
-           meta_graph_suffix="meta",
-           write_meta_graph=True,
-           write_state=True,
-           strip_default_attrs=False):
-    return super(EpochCheckpointInputPipelineHookSaver, self).save(
-        sess, save_path, global_step, latest_filename or self._latest_filename,
-        meta_graph_suffix, write_meta_graph, write_state, strip_default_attrs)
+    def save(
+        self,
+        sess,
+        save_path,
+        global_step=None,
+        latest_filename=None,
+        meta_graph_suffix="meta",
+        write_meta_graph=True,
+        write_state=True,
+        strip_default_attrs=False
+    ):
+        return super(EpochCheckpointInputPipelineHookSaver, self).save(
+            sess, save_path, global_step, latest_filename or
+            self._latest_filename, meta_graph_suffix, write_meta_graph,
+            write_state, strip_default_attrs
+        )
+
 
 class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
     """Checkpoints input pipeline state every N steps or seconds.
@@ -789,17 +845,18 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
     eval. You can do that by not adding the iterator to the SAVEABLE_OBJECTS
     collector when building the eval graph.
     """
-
-    def __init__(self,
-                checkpoint_dir,
-                config,
-                save_timer=None,
-                save_secs=None,
-                save_steps=None,
-                checkpoint_basename="input",
-                listeners=None,
-                defer_build=False,
-                save_relative_paths=True):
+    def __init__(
+        self,
+        checkpoint_dir,
+        config,
+        save_timer=None,
+        save_secs=None,
+        save_steps=None,
+        checkpoint_basename="input",
+        listeners=None,
+        defer_build=False,
+        save_relative_paths=True
+    ):
         """Initializes a `EpochCheckpointInputPipelineHook`.
         Creates a custom EpochCheckpointInputPipelineHookSaver
 
@@ -834,8 +891,9 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
         self._checkpoint_prefix = checkpoint_basename
         if self._config.num_worker_replicas > 1:
             # Distributed setting.
-            suffix = "_{}_{}".format(self._config.task_type,
-                                     self._config.task_id)
+            suffix = "_{}_{}".format(
+                self._config.task_type, self._config.task_id
+            )
             self._checkpoint_prefix += suffix
         # pylint: enable=protected-access
 
@@ -850,8 +908,7 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
             self._timer = save_timer
         else:
             self._timer = tf.train.SecondOrStepTimer(
-                every_secs=save_secs,
-                every_steps=save_steps
+                every_secs=save_secs, every_steps=save_steps
             )
         self._listeners = listeners or []
         self._steps_per_run = 1
@@ -888,16 +945,21 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
             self._latest_filename,
             sharded=False,
             max_to_keep=self._config.keep_checkpoint_max,
-            keep_checkpoint_every_n_hours=self._config.keep_checkpoint_every_n_hours,
+            keep_checkpoint_every_n_hours=self._config.
+            keep_checkpoint_every_n_hours,
             defer_build=self._defer_build,
             save_relative_paths=self._save_relative_paths
         )
 
-        self._summary_writer = tf.summary.FileWriterCache.get(self._checkpoint_dir)
-        self._global_step_tensor = training_util._get_or_create_global_step_read()  # pylint: disable=protected-access
+        self._summary_writer = tf.summary.FileWriterCache.get(
+            self._checkpoint_dir
+        )
+        self._global_step_tensor = training_util._get_or_create_global_step_read(
+        )  # pylint: disable=protected-access
         if self._global_step_tensor is None:
             raise RuntimeError(
-                "Global step should be created to use EpochCheckpointInputPipelineHook.")
+                "Global step should be created to use EpochCheckpointInputPipelineHook."
+            )
         for l in self._listeners:
             l.begin()
 
@@ -941,8 +1003,8 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
         # Check if there is an existing checkpoint. If so, restore from it.
         # pylint: disable=protected-access
         latest_checkpoint_path = tf.train.latest_checkpoint(
-            self._checkpoint_dir,
-            latest_filename=self._latest_filename)
+            self._checkpoint_dir, latest_filename=self._latest_filename
+        )
         if latest_checkpoint_path:
             self._get_saver().restore(session, latest_checkpoint_path)
 
@@ -974,7 +1036,9 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
 
     def after_run(self, run_context, run_values):
         stale_global_step = run_values.results
-        if self._timer.should_trigger_for_step(stale_global_step + self._steps_per_run):
+        if self._timer.should_trigger_for_step(
+            stale_global_step + self._steps_per_run
+        ):
             # get the real value after train op.
             global_step = run_context.session.run(self._global_step_tensor)
             if self._timer.should_trigger_for_step(global_step):
@@ -999,7 +1063,8 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
         """
 
         # delete latest checkpoint file
-        input_checkpoint_files = Path(self._checkpoint_dir).glob(self._checkpoint_prefix + '*')
+        input_checkpoint_files = Path(self._checkpoint_dir
+                                     ).glob(self._checkpoint_prefix + '*')
         # print(input_checkpoint_files)
         for f in input_checkpoint_files:
             if f.exists():
@@ -1011,10 +1076,12 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
         for l in self._listeners:
             l.end(session, last_step)
 
-
     def _save(self, session, step):
         """Saves the latest checkpoint, returns should_stop."""
-        tf.logging.info("Saving\033[31m input\033[0m checkpoints for %d into %s.", step, self._save_path)
+        tf.logging.info(
+            "Saving\033[31m input\033[0m checkpoints for %d into %s.", step,
+            self._save_path
+        )
 
         for l in self._listeners:
             l.before_save(session, step)
@@ -1022,20 +1089,24 @@ class EpochCheckpointInputPipelineHook(tf.train.SessionRunHook):
         self._get_saver().save(session, self._save_path, global_step=step)
         self._summary_writer.add_session_log(
             SessionLog(
-                status=SessionLog.CHECKPOINT, checkpoint_path=self._save_path), # pylint: disable=no-member
-            step)
+                status=SessionLog.CHECKPOINT, checkpoint_path=self._save_path
+            ),  # pylint: disable=no-member
+            step
+        )
 
         should_stop = False
         for l in self._listeners:
             if l.after_save(session, step):
                 tf.logging.info(
                     "A CheckpointSaverListener requested that training be stopped. "
-                    "listener: {}".format(l))
+                    "listener: {}".format(l)
+                )
                 should_stop = True
         return should_stop
 
     def _get_saver(self):
         return self._saver
+
 
 class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
     """This checkpoint saver hook saves two types of checkpoints:
@@ -1076,23 +1147,24 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
 
     Fixes more than one graph event per run warning in Tensorboard
     """
-
-    def __init__(self,
-                checkpoint_dir,
-                epoch_tensor=None,
-                save_timer=None,
-                save_secs=None,
-                save_steps=None,
-                saver=None,
-                checkpoint_basename=None,
-                scaffold=None,
-                listeners=None,
-                step_listeners=None,
-                epoch_saver=None,
-                epoch_basename='epoch',
-                step_basename='step',
-                epoch_latest_filename='epoch.latest',
-                step_latest_filename='step.latest'):
+    def __init__(
+        self,
+        checkpoint_dir,
+        epoch_tensor=None,
+        save_timer=None,
+        save_secs=None,
+        save_steps=None,
+        saver=None,
+        checkpoint_basename=None,
+        scaffold=None,
+        listeners=None,
+        step_listeners=None,
+        epoch_saver=None,
+        epoch_basename='epoch',
+        step_basename='step',
+        epoch_latest_filename='epoch.latest',
+        step_latest_filename='step.latest'
+    ):
         """Maintains compatibility with the `CheckpointSaverHook`.
 
         Args:
@@ -1123,7 +1195,9 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
         self._saver = saver
         self._checkpoint_dir = checkpoint_dir
         checkpoint_basename = checkpoint_basename or ''
-        epoch_basename = ''.join((checkpoint_basename, epoch_basename or 'step'))
+        epoch_basename = ''.join(
+            (checkpoint_basename, epoch_basename or 'step')
+        )
         step_basename = ''.join((checkpoint_basename, step_basename or 'step'))
         self._epoch_save_path = os.path.join(checkpoint_dir, epoch_basename)
         self._step_save_path = os.path.join(checkpoint_dir, step_basename)
@@ -1134,8 +1208,7 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
             self._timer = save_timer
         else:
             self._timer = tf.train.SecondOrStepTimer(
-                every_secs=save_secs,
-                every_steps=save_steps
+                every_secs=save_secs, every_steps=save_steps
             )
         self._epoch_listeners = listeners or []
         # In _train_with_estimator_spec
@@ -1158,11 +1231,15 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
         can not modify the graph anymore. Second call of `begin()` on the same
         graph, should not change the graph.
         """
-        self._summary_writer = tf.summary.FileWriterCache.get(self._checkpoint_dir)
-        self._global_step_tensor = training_util._get_or_create_global_step_read()  # pylint: disable=protected-access
+        self._summary_writer = tf.summary.FileWriterCache.get(
+            self._checkpoint_dir
+        )
+        self._global_step_tensor = training_util._get_or_create_global_step_read(
+        )  # pylint: disable=protected-access
         if self._global_step_tensor is None:
             raise RuntimeError(
-                "Global step should be created to use EpochCheckpointSaverHook.")
+                "Global step should be created to use EpochCheckpointSaverHook."
+            )
 
         if self._epoch_saver is None:
             self._epoch_saver = tf.train.Saver(
@@ -1199,16 +1276,17 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
         # add variables in begin. Graph is finalized after all begin calls.
         tf.train.write_graph(
             tf.get_default_graph().as_graph_def(add_shapes=True),
-            self._checkpoint_dir,
-            "graph.pbtxt"
+            self._checkpoint_dir, "graph.pbtxt"
         )
         saver_def = self._get_saver().saver_def if self._get_saver() else None
         graph = tf.get_default_graph()
         meta_graph_def = meta_graph.create_meta_graph_def(
-            graph_def=graph.as_graph_def(add_shapes=True),
-            saver_def=saver_def)
+            graph_def=graph.as_graph_def(add_shapes=True), saver_def=saver_def
+        )
         self._summary_writer.add_graph(graph, global_step=global_step)
-        self._summary_writer.add_meta_graph(meta_graph_def, global_step=global_step)
+        self._summary_writer.add_meta_graph(
+            meta_graph_def, global_step=global_step
+        )
         # The checkpoint saved here is the state at step "global_step".
         # do not save any checkpoints at start
         # self._save(session, global_step)
@@ -1253,7 +1331,9 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
         run_values: A SessionRunValues object.
         """
         stale_global_step = run_values.results
-        if self._timer.should_trigger_for_step(stale_global_step + self._steps_per_run):
+        if self._timer.should_trigger_for_step(
+            stale_global_step + self._steps_per_run
+        ):
             # get the real value after train op.
             global_step = run_context.session.run(self._global_step_tensor)
             if self._timer.should_trigger_for_step(global_step):
@@ -1302,14 +1382,16 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
         for l in self._step_listeners:
             l.end(session, last_step)
 
-
     def _save_epoch(self, session, step, epoch):
         """Saves the latest checkpoint, returns should_stop."""
         if epoch:
             save_path = '{}-{}'.format(self._epoch_save_path, epoch)
         else:
             save_path = self._epoch_save_path
-        tf.logging.info("Saving\033[1;31m epoch\033[0m checkpoints for %d into %s.", step, save_path)
+        tf.logging.info(
+            "Saving\033[1;31m epoch\033[0m checkpoints for %d into %s.", step,
+            save_path
+        )
 
         for l in self._epoch_listeners:
             l.before_save(session, step)
@@ -1332,13 +1414,17 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
             if l.after_save(session, step):
                 tf.logging.info(
                     "An Epoch CheckpointSaverListener requested that training be stopped. "
-                    "listener: {}".format(l))
+                    "listener: {}".format(l)
+                )
                 should_stop = True
         return should_stop
 
     def _save_step(self, session, step):
         """Saves the latest checkpoint, returns should_stop."""
-        tf.logging.info("Saving\033[1;31m step\033[0m checkpoints for %d into %s.", step, self._step_save_path)
+        tf.logging.info(
+            "Saving\033[1;31m step\033[0m checkpoints for %d into %s.", step,
+            self._step_save_path
+        )
 
         for l in self._step_listeners:
             l.before_save(session, step)
@@ -1357,7 +1443,10 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
             strip_default_attrs=False
         )
         self._summary_writer.add_session_log(
-            SessionLog(status=SessionLog.CHECKPOINT, checkpoint_path=self._step_save_path), # pylint: disable=no-member
+            SessionLog(
+                status=SessionLog.CHECKPOINT,
+                checkpoint_path=self._step_save_path
+            ),  # pylint: disable=no-member
             step
         )
 
@@ -1366,7 +1455,8 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
             if l.after_save(session, step):
                 tf.logging.info(
                     "A Step CheckpointSaverListener requested that training be stopped. "
-                    "listener: {}".format(l))
+                    "listener: {}".format(l)
+                )
                 should_stop = True
         return should_stop
 
@@ -1389,12 +1479,14 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
         if not savers:
             raise RuntimeError(
                 "No items in collection {}. Please add a saver to the collection "
-                "or provide a saver or scaffold.".format(collection_key))
+                "or provide a saver or scaffold.".format(collection_key)
+            )
         elif len(savers) > 1:
             raise RuntimeError(
                 "More than one item in collection {}. "
-                "Please indicate which one to use by passing it to the constructor.".
-                format(collection_key))
+                "Please indicate which one to use by passing it to the constructor."
+                .format(collection_key)
+            )
 
         self._saver = savers[0]
         return savers[0]
@@ -1402,14 +1494,19 @@ class EpochCheckpointSaverHook(tf.train.CheckpointSaverHook):
     def _get_saver(self):
         return self._get_step_saver()
 
+
 orig_stdout = sys.stdout
+
+
 class EpochProgressBarHook(tf.train.SessionRunHook):
-    def __init__(self,
-                 total,
-                 initial_tensor,
-                 n_tensor,
-                 postfix_tensors=None,
-                 every_n_iter=None):
+    def __init__(
+        self,
+        total,
+        initial_tensor,
+        n_tensor,
+        postfix_tensors=None,
+        every_n_iter=None
+    ):
         self._total = total
         self._initial_tensor = initial_tensor
         self._n_tensor = n_tensor
@@ -1523,11 +1620,9 @@ class EpochProgressBarHook(tf.train.SessionRunHook):
 
 
 class EvalProgressBarHook(tf.train.SessionRunHook):
-    def __init__(self,
-                 total,
-                 n_tensor,
-                 postfix_tensors=None,
-                 every_n_iter=None):
+    def __init__(
+        self, total, n_tensor, postfix_tensors=None, every_n_iter=None
+    ):
         self._total = total
         self._n_tensor = n_tensor
 
@@ -1647,15 +1742,18 @@ class ColoredLoggingTensorHook(tf.train.LoggingTensorHook):
     Note that if `at_end` is True, `tensors` should not include any tensor
     whose evaluation produces a side effect such as consuming additional inputs.
     """
-
     def _log_tensors(self, tensor_values):
         original = np.get_printoptions()
         np.set_printoptions(suppress=True)
-        elapsed_secs, _ = self._timer.update_last_triggered_step(self._iter_count)
+        elapsed_secs, _ = self._timer.update_last_triggered_step(
+            self._iter_count
+        )
         if self._formatter:
             if elapsed_secs is not None:
-                tf.logging.info("%s (%.3f sec)", self._formatter(
-                    tensor_values), elapsed_secs)
+                tf.logging.info(
+                    "%s (%.3f sec)", self._formatter(tensor_values),
+                    elapsed_secs
+                )
             else:
                 tf.logging.info(self._formatter(tensor_values))
         else:
@@ -1718,7 +1816,6 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
 
     ```
     """
-
     def __init__(
         self,
         # protein, lengths, labels, label_prob, label_rank,
@@ -1728,7 +1825,7 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
         output_dir=None,
         output_prefix=None,
         output_format='json'
-        ):
+    ):
         """Initializes this hook.
         Args:
           protein: protien sequence data.
@@ -1770,10 +1867,15 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
         #     raise RuntimeError('The model did not define top_classes.')
         # if not self._top_probs:
         #     raise RuntimeError('The model did not define top_probs.')
-        self._tensors['global_step'] = tf.train.get_global_step() # global step of checkpoint
+        self._tensors['global_step'] = tf.train.get_global_step(
+        )  # global step of checkpoint
         if self._tensors['global_step'] is None:
-            raise RuntimeError('Global step should be created to use SaveEvaluationResultHook.')
-        self._tensors['eval_step'] = tf.contrib.training.get_or_create_eval_step() # a counter for the evaluation step
+            raise RuntimeError(
+                'Global step should be created to use SaveEvaluationResultHook.'
+            )
+        self._tensors['eval_step'
+                     ] = tf.contrib.training.get_or_create_eval_step(
+                     )  # a counter for the evaluation step
 
     def before_run(self, run_context):  # pylint: disable=unused-argument
         return tf.train.SessionRunArgs(self._tensors)
@@ -1788,14 +1890,20 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
         del results['lengths']
         # generate default output_dir and output_prefix if needed
         if not self._output_dir:
-            self._output_dir = str(Path(self._model_dir) / 'eval-{}'.format(global_step))
+            self._output_dir = str(
+                Path(self._model_dir) / 'eval-{}'.format(global_step)
+            )
         if not self._output_prefix:
-            self._output_prefix = '{}@{}'.format(Path(self._model_dir).name, global_step)
-        output_path = Path(self._output_dir) / '{}-{}.{}'.format(self._output_prefix, eval_step, self._output_format)
+            self._output_prefix = '{}@{}'.format(
+                Path(self._model_dir).name, global_step
+            )
+        output_path = Path(self._output_dir) / '{}-{}.{}'.format(
+            self._output_prefix, eval_step, self._output_format
+        )
         if self._first_run:
             self._first_run = False
             # make sure directories exist
-            output_path.parent.mkdir(parents=True, exist_ok=True) # pylint: disable=no-member
+            output_path.parent.mkdir(parents=True, exist_ok=True)  # pylint: disable=no-member
         # remove padding
         reslist = []
         for i in range(len(lengths)):
@@ -1806,15 +1914,17 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
             reslist.append(res)
 
         if self._output_format == 'json':
-            with output_path.open(encoding='utf-8', mode='w') as f: # pylint: disable=no-member
-                json.dump(reslist, f, indent=2, sort_keys=False, cls=NumpyEncoder)
+            with output_path.open(encoding='utf-8', mode='w') as f:  # pylint: disable=no-member
+                json.dump(
+                    reslist, f, indent=2, sort_keys=False, cls=NumpyEncoder
+                )
             # e1 = json.loads(Path(r'4951306-1.json').read_text())
         elif self._output_format == 'msgpack':
-            with output_path.open(mode='wb') as f: # pylint: disable=no-member
+            with output_path.open(mode='wb') as f:  # pylint: disable=no-member
                 msgpack.dump(reslist, f)
             # e1 = msgpack.loads(Path(r'4951306-1.msgpack').read_bytes())
         elif self._output_format == 'msgpack.gz':
-            with gzip.open(output_path, mode='wb') as f: # pylint: disable=no-member
+            with gzip.open(output_path, mode='wb') as f:  # pylint: disable=no-member
                 msgpack.dump(reslist, f)
             # e1 = msgpack.loads(Path(r'4951306-1.msgpack').read_bytes())
 
@@ -1822,6 +1932,7 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
         tf.logging.info('Evaluation results saved to %s', self._output_dir)
         # if self._post_evaluation_fn is not None:
         #     self._post_evaluation_fn(self._current_step, self._output_path)
+
 
 # num_domain = 10
 # test_split = 0.2
@@ -1888,18 +1999,31 @@ label_rank = tf.reshape(tf.where(tf.equal(top_classes, tf.expand_dims(labels, -1
 # # 13000/53795 [======>.......................] - ETA: 7:24:26 - loss: 0.0776 - acc: 0.9745(64, 3163) (64, 3163, 1) 3163 3163
 
 
-def float32_variable_storage_getter(getter, name, shape=None, dtype=None,
-                                    initializer=None, regularizer=None,
-                                    trainable=True,
-                                    *args, **kwargs):
+def float32_variable_storage_getter(
+    getter,
+    name,
+    shape=None,
+    dtype=None,
+    initializer=None,
+    regularizer=None,
+    trainable=True,
+    *args,
+    **kwargs
+):
     """Custom variable getter that forces trainable variables to be stored in
     float32 precision and then casts them to the training precision.
     """
     storage_dtype = tf.float32 if trainable else dtype
-    variable = getter(name, shape, dtype=storage_dtype,
-                      initializer=initializer, regularizer=regularizer,
-                      trainable=trainable,
-                      *args, **kwargs)
+    variable = getter(
+        name,
+        shape,
+        dtype=storage_dtype,
+        initializer=initializer,
+        regularizer=regularizer,
+        trainable=trainable,
+        *args,
+        **kwargs
+    )
     if trainable and dtype != tf.float32:
         variable = tf.cast(variable, dtype)
         kwargs
@@ -1909,9 +2033,18 @@ def float32_variable_storage_getter(getter, name, shape=None, dtype=None,
 def softmax_mask(val, mask, inf=1e30):
     return -inf * (1 - tf.cast(mask, tf.float32)) + val
 
-def dot_attention(inputs, memory, mask, units,
-    drop_inputs=0.0, drop_memory=0.0, drop_res=0.2,
-    is_train=None, scope='dot_attention'):
+
+def dot_attention(
+    inputs,
+    memory,
+    mask,
+    units,
+    drop_inputs=0.0,
+    drop_memory=0.0,
+    drop_res=0.2,
+    is_train=None,
+    scope='dot_attention'
+):
     """
     memory (key): A sequence of vectors also known as the memory. It is the contextual information that we want to look at. In traditional sequence-to-sequence learning they are usually the RNN encoder outputs.
     Values: A sequence of vectors from which we aggregate the output through a weighted linear combination. Often Keys serve as Values.
@@ -1934,7 +2067,7 @@ def dot_attention(inputs, memory, mask, units,
             training=is_train,
             name='drop_memory'
         )
-        sequence_length = tf.shape(inputs)[1] # sequence_length
+        sequence_length = tf.shape(inputs)[1]  # sequence_length
 
         inputs_ = tf.layers.dense(
             inputs=d_inputs,
@@ -1968,7 +2101,8 @@ def dot_attention(inputs, memory, mask, units,
             name='memory',
             reuse=None
         )
-        outputs = tf.matmul(inputs_, tf.transpose(memory_, [0, 2, 1])) / (units ** 0.5)
+        outputs = tf.matmul(inputs_, tf.transpose(memory_,
+                                                  [0, 2, 1])) / (units**0.5)
         # mask
         #   shape=(batch_size, sequence_length), dtype=float32
         # mask.expand_dims
@@ -2007,30 +2141,39 @@ def dot_attention(inputs, memory, mask, units,
             )
             return res * gate
 
+
 class Attention(tf.layers.Layer):
-  """Multi-headed attention layer."""
+    """Multi-headed attention layer."""
+    def __init__(self, hidden_size, num_heads, attention_dropout, train):
+        if hidden_size % num_heads != 0:
+            raise ValueError(
+                "Hidden size must be evenly divisible by the number of "
+                "heads."
+            )
 
-  def __init__(self, hidden_size, num_heads, attention_dropout, train):
-    if hidden_size % num_heads != 0:
-      raise ValueError("Hidden size must be evenly divisible by the number of "
-                       "heads.")
+        super(Attention, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+        self.attention_dropout = attention_dropout
+        self.train = train
 
-    super(Attention, self).__init__()
-    self.hidden_size = hidden_size
-    self.num_heads = num_heads
-    self.attention_dropout = attention_dropout
-    self.train = train
+        # Layers for linearly projecting the queries, keys, and values.
+        self.q_dense_layer = tf.layers.Dense(
+            hidden_size, use_bias=False, name="q"
+        )
+        self.k_dense_layer = tf.layers.Dense(
+            hidden_size, use_bias=False, name="k"
+        )
+        self.v_dense_layer = tf.layers.Dense(
+            hidden_size, use_bias=False, name="v"
+        )
 
-    # Layers for linearly projecting the queries, keys, and values.
-    self.q_dense_layer = tf.layers.Dense(hidden_size, use_bias=False, name="q")
-    self.k_dense_layer = tf.layers.Dense(hidden_size, use_bias=False, name="k")
-    self.v_dense_layer = tf.layers.Dense(hidden_size, use_bias=False, name="v")
+        self.output_dense_layer = tf.layers.Dense(
+            hidden_size, use_bias=False, name="output_transform"
+        )
 
-    self.output_dense_layer = tf.layers.Dense(hidden_size, use_bias=False,
-                                              name="output_transform")
-
-  def split_heads(self, x):
-    """Split x into different heads, and transpose the resulting value.
+    def split_heads(self, x):
+        """Split x into different heads, and transpose the resulting value.
     The tensor is transposed to insure the inner dimensions hold the correct
     values during the matrix multiplication.
     Args:
@@ -2038,34 +2181,36 @@ class Attention(tf.layers.Layer):
     Returns:
       A tensor with shape [batch_size, num_heads, length, hidden_size/num_heads]
     """
-    with tf.name_scope("split_heads"):
-      batch_size = tf.shape(x)[0]
-      length = tf.shape(x)[1]
+        with tf.name_scope("split_heads"):
+            batch_size = tf.shape(x)[0]
+            length = tf.shape(x)[1]
 
-      # Calculate depth of last dimension after it has been split.
-      depth = (self.hidden_size // self.num_heads)
+            # Calculate depth of last dimension after it has been split.
+            depth = (self.hidden_size // self.num_heads)
 
-      # Split the last dimension
-      x = tf.reshape(x, [batch_size, length, self.num_heads, depth])
+            # Split the last dimension
+            x = tf.reshape(x, [batch_size, length, self.num_heads, depth])
 
-      # Transpose the result
-      return tf.transpose(x, [0, 2, 1, 3])
+            # Transpose the result
+            return tf.transpose(x, [0, 2, 1, 3])
 
-  def combine_heads(self, x):
-    """Combine tensor that has been split.
+    def combine_heads(self, x):
+        """Combine tensor that has been split.
     Args:
       x: A tensor [batch_size, num_heads, length, hidden_size/num_heads]
     Returns:
       A tensor with shape [batch_size, length, hidden_size]
     """
-    with tf.name_scope("combine_heads"):
-      batch_size = tf.shape(x)[0]
-      length = tf.shape(x)[2]
-      x = tf.transpose(x, [0, 2, 1, 3])  # --> [batch, length, num_heads, depth]
-      return tf.reshape(x, [batch_size, length, self.hidden_size])
+        with tf.name_scope("combine_heads"):
+            batch_size = tf.shape(x)[0]
+            length = tf.shape(x)[2]
+            x = tf.transpose(
+                x, [0, 2, 1, 3]
+            )  # --> [batch, length, num_heads, depth]
+            return tf.reshape(x, [batch_size, length, self.hidden_size])
 
-  def call(self, x, y, bias, cache=None):
-    """Apply attention mechanism to x and y.
+    def call(self, x, y, bias, cache=None):
+        """Apply attention mechanism to x and y.
     Args:
       x: a tensor with shape [batch_size, length_x, hidden_size]
       y: a tensor with shape [batch_size, length_y, hidden_size]
@@ -2078,66 +2223,66 @@ class Attention(tf.layers.Layer):
     Returns:
       Attention layer output with shape [batch_size, length_x, hidden_size]
     """
-    # Linearly project the query (q), key (k) and value (v) using different
-    # learned projections. This is in preparation of splitting them into
-    # multiple heads. Multi-head attention uses multiple queries, keys, and
-    # values rather than regular attention (which uses a single q, k, v).
-    q = self.q_dense_layer(x)
-    k = self.k_dense_layer(y)
-    v = self.v_dense_layer(y)
+        # Linearly project the query (q), key (k) and value (v) using different
+        # learned projections. This is in preparation of splitting them into
+        # multiple heads. Multi-head attention uses multiple queries, keys, and
+        # values rather than regular attention (which uses a single q, k, v).
+        q = self.q_dense_layer(x)
+        k = self.k_dense_layer(y)
+        v = self.v_dense_layer(y)
 
-    if cache is not None:
-      # Combine cached keys and values with new keys and values.
-      k = tf.concat([cache["k"], k], axis=1)
-      v = tf.concat([cache["v"], v], axis=1)
+        if cache is not None:
+            # Combine cached keys and values with new keys and values.
+            k = tf.concat([cache["k"], k], axis=1)
+            v = tf.concat([cache["v"], v], axis=1)
 
-      # Update cache
-      cache["k"] = k
-      cache["v"] = v
+            # Update cache
+            cache["k"] = k
+            cache["v"] = v
 
-    # Split q, k, v into heads.
-    q = self.split_heads(q)
-    k = self.split_heads(k)
-    v = self.split_heads(v)
+        # Split q, k, v into heads.
+        q = self.split_heads(q)
+        k = self.split_heads(k)
+        v = self.split_heads(v)
 
-    # Scale q to prevent the dot product between q and k from growing too large.
-    depth = (self.hidden_size // self.num_heads)
-    q *= depth ** -0.5
-    # a = tf.constant()
-    # Calculate dot product attention
-    #logits = tf.matmul(q, k, transpose_b=True)
-    #logits += bias
-    #weights = tf.nn.softmax(logits, name="attention_weights")
-    logits = tf.matmul(q, k, transpose_b=True)
-    # [batch_size, heads, length, units] * [batch_size, heads, units, length]
-    # logits shape = [batch_size, heads, length, length]
-    dtype = logits.dtype
-    if dtype != tf.float32:
-      # upcast softmax inputs
-      logits = tf.cast(x=logits, dtype=tf.float32)
-      logits += bias
-      weights = tf.nn.softmax(logits, name="attention_weights")
-      # downcast softmax output
-      weights = tf.cast(weights, dtype=dtype)
-    else:
-      logits += bias
-      # bias shape = [batch_size, 1, 1, length]
-      weights = tf.nn.softmax(logits, name="attention_weights")
+        # Scale q to prevent the dot product between q and k from growing too large.
+        depth = (self.hidden_size // self.num_heads)
+        q *= depth**-0.5
+        # a = tf.constant()
+        # Calculate dot product attention
+        #logits = tf.matmul(q, k, transpose_b=True)
+        #logits += bias
+        #weights = tf.nn.softmax(logits, name="attention_weights")
+        logits = tf.matmul(q, k, transpose_b=True)
+        # [batch_size, heads, length, units] * [batch_size, heads, units, length]
+        # logits shape = [batch_size, heads, length, length]
+        dtype = logits.dtype
+        if dtype != tf.float32:
+            # upcast softmax inputs
+            logits = tf.cast(x=logits, dtype=tf.float32)
+            logits += bias
+            weights = tf.nn.softmax(logits, name="attention_weights")
+            # downcast softmax output
+            weights = tf.cast(weights, dtype=dtype)
+        else:
+            logits += bias
+            # bias shape = [batch_size, 1, 1, length]
+            weights = tf.nn.softmax(logits, name="attention_weights")
 
+        if self.train:
+            weights = tf.nn.dropout(weights, 1.0 - self.attention_dropout)
+        attention_output = tf.matmul(weights, v)
 
-    if self.train:
-      weights = tf.nn.dropout(weights, 1.0 - self.attention_dropout)
-    attention_output = tf.matmul(weights, v)
+        # Recombine heads --> [batch_size, length, hidden_size]
+        attention_output = self.combine_heads(attention_output)
 
-    # Recombine heads --> [batch_size, length, hidden_size]
-    attention_output = self.combine_heads(attention_output)
+        # Run the combined outputs through another linear projection layer.
+        attention_output = self.output_dense_layer(attention_output)
+        return attention_output
 
-    # Run the combined outputs through another linear projection layer.
-    attention_output = self.output_dense_layer(attention_output)
-    return attention_output
 
 def get_padding(x, padding_value=0, dtype=tf.float32):
-  """Return float tensor representing the padding values in x.
+    """Return float tensor representing the padding values in x.
   Args:
     x: int tensor with any shape
     padding_value: int value that
@@ -2146,12 +2291,12 @@ def get_padding(x, padding_value=0, dtype=tf.float32):
     flaot tensor with same shape as x containing values 0 or 1.
       0 -> non-padding, 1 -> padding
   """
-  with tf.name_scope("padding"):
-    return tf.cast(tf.equal(x, padding_value), dtype=dtype)
+    with tf.name_scope("padding"):
+        return tf.cast(tf.equal(x, padding_value), dtype=dtype)
 
 
 def get_padding_bias(x, res_rank=4, pad_sym=0):
-  """Calculate bias tensor from padding values in tensor.
+    """Calculate bias tensor from padding values in tensor.
   Bias tensor that is added to the pre-softmax multi-headed attention logits,
   which has shape [batch_size, num_heads, length, length]. The tensor is zero at
   non-padding locations, and -1e9 (negative infinity) at padding locations.
@@ -2165,60 +2310,70 @@ def get_padding_bias(x, res_rank=4, pad_sym=0):
     [batch_size, 1, 1, length] if  res_rank = 4 - for Transformer
     or [batch_size, 1, length] if res_rank = 3 - for ConvS2S
   """
-  with tf.name_scope("attention_bias"):
-    padding = get_padding(x, padding_value=pad_sym)
-    attention_bias = padding * _NEG_INF
-    if res_rank == 4:
-      attention_bias = tf.expand_dims(tf.expand_dims(attention_bias, axis=1), axis=1)
-    elif res_rank == 3:
-      attention_bias = tf.expand_dims(attention_bias, axis=1)
-    else:
-      raise ValueError("res_rank should be 3 or 4 but got {}".format(res_rank))
-  return attention_bias
+    with tf.name_scope("attention_bias"):
+        padding = get_padding(x, padding_value=pad_sym)
+        attention_bias = padding * _NEG_INF
+        if res_rank == 4:
+            attention_bias = tf.expand_dims(
+                tf.expand_dims(attention_bias, axis=1), axis=1
+            )
+        elif res_rank == 3:
+            attention_bias = tf.expand_dims(attention_bias, axis=1)
+        else:
+            raise ValueError(
+                "res_rank should be 3 or 4 but got {}".format(res_rank)
+            )
+    return attention_bias
+
 
 class SelfAttention(Attention):
-  """Multiheaded self-attention layer."""
+    """Multiheaded self-attention layer."""
+    def call(self, x, bias, cache=None):
+        return super(SelfAttention, self).call(x, x, bias, cache)
 
-  def call(self, x, bias, cache=None):
-    return super(SelfAttention, self).call(x, x, bias, cache)
 
 # tensor2tensor start
 
+
 def shape_list(x):
-  """Return list of dims, statically where possible."""
-  x = tf.convert_to_tensor(x)
+    """Return list of dims, statically where possible."""
+    x = tf.convert_to_tensor(x)
 
-  # If unknown rank, return dynamic shape
-  if x.get_shape().dims is None:
-    return tf.shape(x)
+    # If unknown rank, return dynamic shape
+    if x.get_shape().dims is None:
+        return tf.shape(x)
 
-  static = x.get_shape().as_list()
-  shape = tf.shape(x)
+    static = x.get_shape().as_list()
+    shape = tf.shape(x)
 
-  ret = []
-  for i in range(len(static)):
-    dim = static[i]
-    if dim is None:
-      dim = shape[i]
-    ret.append(dim)
-  return ret
+    ret = []
+    for i in range(len(static)):
+        dim = static[i]
+        if dim is None:
+            dim = shape[i]
+        ret.append(dim)
+    return ret
+
 
 def cast_like(x, y):
-  """Cast x to y's dtype, if necessary."""
-  x = tf.convert_to_tensor(x)
-  y = tf.convert_to_tensor(y)
+    """Cast x to y's dtype, if necessary."""
+    x = tf.convert_to_tensor(x)
+    y = tf.convert_to_tensor(y)
 
-  if x.dtype.base_dtype == y.dtype.base_dtype:
-    return x
+    if x.dtype.base_dtype == y.dtype.base_dtype:
+        return x
 
-  cast_x = tf.cast(x, y.dtype)
-  if cast_x.device != x.device:
-    tf.logging.warning("Cast for %s may induce copy from '%s' to '%s'", x.name,
-                       x.device, cast_x.device)
-  return cast_x
+    cast_x = tf.cast(x, y.dtype)
+    if cast_x.device != x.device:
+        tf.logging.warning(
+            "Cast for %s may induce copy from '%s' to '%s'", x.name, x.device,
+            cast_x.device
+        )
+    return cast_x
+
 
 def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
-  """Like tf.nn.dropout but takes broadcast_dims instead of noise_shape.
+    """Like tf.nn.dropout but takes broadcast_dims instead of noise_shape.
 
   Instead of specifying noise_shape, this function takes broadcast_dims -
   a list of dimension numbers in which noise_shape should be 1.  The random
@@ -2235,34 +2390,38 @@ def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
   Returns:
     Tensor of the same shape as x.
   """
-  assert "noise_shape" not in kwargs
-  if broadcast_dims:
-    shape = tf.shape(x)
-    ndims = len(x.get_shape())
-    # Allow dimensions like "-1" as well.
-    broadcast_dims = [dim + ndims if dim < 0 else dim for dim in broadcast_dims]
-    kwargs["noise_shape"] = [
-        1 if i in broadcast_dims else shape[i] for i in range(ndims)
-    ]
-  return tf.nn.dropout(x, keep_prob, **kwargs)
+    assert "noise_shape" not in kwargs
+    if broadcast_dims:
+        shape = tf.shape(x)
+        ndims = len(x.get_shape())
+        # Allow dimensions like "-1" as well.
+        broadcast_dims = [
+            dim + ndims if dim < 0 else dim for dim in broadcast_dims
+        ]
+        kwargs["noise_shape"] = [
+            1 if i in broadcast_dims else shape[i] for i in range(ndims)
+        ]
+    return tf.nn.dropout(x, keep_prob, **kwargs)
+
 
 def should_generate_summaries():
-  """Is this an appropriate context to generate summaries.
+    """Is this an appropriate context to generate summaries.
 
   Returns:
     a boolean
   """
-  name_scope = tf.contrib.framework.get_name_scope()
-  if name_scope and "while/" in name_scope:
-    # Summaries don't work well within tf.while_loop()
-    return False
-  if tf.get_variable_scope().reuse:
-    # Avoid generating separate summaries for different data shards
-    return False
-  return True
+    name_scope = tf.contrib.framework.get_name_scope()
+    if name_scope and "while/" in name_scope:
+        # Summaries don't work well within tf.while_loop()
+        return False
+    if tf.get_variable_scope().reuse:
+        # Avoid generating separate summaries for different data shards
+        return False
+    return True
+
 
 def split_last_dimension(x, n):
-  """Reshape x so that the last dimension becomes two dimensions.
+    """Reshape x so that the last dimension becomes two dimensions.
 
   The first of these two dimensions is n.
 
@@ -2273,14 +2432,15 @@ def split_last_dimension(x, n):
   Returns:
     a Tensor with shape [..., n, m/n]
   """
-  x_shape = shape_list(x)
-  m = x_shape[-1]
-  if isinstance(m, int) and isinstance(n, int):
-    assert m % n == 0
-  return tf.reshape(x, x_shape[:-1] + [n, m // n])
+    x_shape = shape_list(x)
+    m = x_shape[-1]
+    if isinstance(m, int) and isinstance(n, int):
+        assert m % n == 0
+    return tf.reshape(x, x_shape[:-1] + [n, m // n])
+
 
 def attention_image_summary(attn, image_shapes=None):
-  """Compute color image summary.
+    """Compute color image summary.
 
   Args:
     attn: a Tensor with shape [batch, num_heads, query_length, memory_length]
@@ -2293,37 +2453,45 @@ def attention_image_summary(attn, image_shapes=None):
         (query_rows, query_cols, query_channels,
          memory_rows, memory_cols, memory_channels).
   """
-  attn = tf.cast(attn, tf.float32)
-  num_heads = shape_list(attn)[1]
-  # [batch, query_length, memory_length, num_heads]
-  image = tf.transpose(attn, [0, 2, 3, 1])
-  image = tf.pow(image, 0.2)  # for high-dynamic-range
-  # Each head will correspond to one of RGB.
-  # pad the heads to be a multiple of 3
-  image = tf.pad(image, [[0, 0], [0, 0], [0, 0], [0, tf.mod(-num_heads, 3)]])
-  image = split_last_dimension(image, 3)
-  image = tf.reduce_max(image, 4)
-  if image_shapes is not None:
-    if len(image_shapes) == 4:
-      q_rows, q_cols, m_rows, m_cols = list(image_shapes)
-      image = tf.reshape(image, [-1, q_rows, q_cols, m_rows, m_cols, 3])
-      image = tf.transpose(image, [0, 1, 3, 2, 4, 5])
-      image = tf.reshape(image, [-1, q_rows * m_rows, q_cols * m_cols, 3])
-    else:
-      assert len(image_shapes) == 6
-      q_rows, q_cols, q_channnels, m_rows, m_cols, m_channels = list(
-          image_shapes)
-      image = tf.reshape(
-          image,
-          [-1, q_rows, q_cols, q_channnels, m_rows, m_cols, m_channels, 3])
-      image = tf.transpose(image, [0, 1, 4, 3, 2, 5, 6, 7])
-      image = tf.reshape(
-          image,
-          [-1, q_rows * m_rows * q_channnels, q_cols * m_cols * m_channels, 3])
-  tf.summary.image("attention", image, max_outputs=1)
+    attn = tf.cast(attn, tf.float32)
+    num_heads = shape_list(attn)[1]
+    # [batch, query_length, memory_length, num_heads]
+    image = tf.transpose(attn, [0, 2, 3, 1])
+    image = tf.pow(image, 0.2)  # for high-dynamic-range
+    # Each head will correspond to one of RGB.
+    # pad the heads to be a multiple of 3
+    image = tf.pad(image, [[0, 0], [0, 0], [0, 0], [0, tf.mod(-num_heads, 3)]])
+    image = split_last_dimension(image, 3)
+    image = tf.reduce_max(image, 4)
+    if image_shapes is not None:
+        if len(image_shapes) == 4:
+            q_rows, q_cols, m_rows, m_cols = list(image_shapes)
+            image = tf.reshape(image, [-1, q_rows, q_cols, m_rows, m_cols, 3])
+            image = tf.transpose(image, [0, 1, 3, 2, 4, 5])
+            image = tf.reshape(image, [-1, q_rows * m_rows, q_cols * m_cols, 3])
+        else:
+            assert len(image_shapes) == 6
+            q_rows, q_cols, q_channnels, m_rows, m_cols, m_channels = list(
+                image_shapes
+            )
+            image = tf.reshape(
+                image, [
+                    -1, q_rows, q_cols, q_channnels, m_rows, m_cols, m_channels,
+                    3
+                ]
+            )
+            image = tf.transpose(image, [0, 1, 4, 3, 2, 5, 6, 7])
+            image = tf.reshape(
+                image, [
+                    -1, q_rows * m_rows * q_channnels,
+                    q_cols * m_cols * m_channels, 3
+                ]
+            )
+    tf.summary.image("attention", image, max_outputs=1)
+
 
 def reshape_by_blocks(x, x_shape, memory_block_size):
-  """Reshapes input by splitting its length over blocks of memory_block_size.
+    """Reshapes input by splitting its length over blocks of memory_block_size.
 
   Args:
     x: a Tensor with shape [batch, heads, length, depth]
@@ -2334,14 +2502,17 @@ def reshape_by_blocks(x, x_shape, memory_block_size):
     Tensor with shape
     [batch, heads, length // memory_block_size, memory_block_size, depth].
   """
-  x = tf.reshape(x, [
-      x_shape[0], x_shape[1], x_shape[2] // memory_block_size,
-      memory_block_size, x_shape[3]
-  ])
-  return x
+    x = tf.reshape(
+        x, [
+            x_shape[0], x_shape[1], x_shape[2] // memory_block_size,
+            memory_block_size, x_shape[3]
+        ]
+    )
+    return x
+
 
 def embedding_to_padding(emb):
-  """Calculates the padding mask based on which embeddings are all zero.
+    """Calculates the padding mask based on which embeddings are all zero.
 
   We have hacked symbol_modality to return all-zero embeddings for padding.
 
@@ -2352,11 +2523,12 @@ def embedding_to_padding(emb):
     a float Tensor with shape [...]. Each element is 1 if its corresponding
     embedding vector is all zero, and is 0 otherwise.
   """
-  emb_sum = tf.reduce_sum(tf.abs(emb), axis=-1)
-  return tf.cast(tf.equal(emb_sum, 0.0), dtype=tf.float32)
+    emb_sum = tf.reduce_sum(tf.abs(emb), axis=-1)
+    return tf.cast(tf.equal(emb_sum, 0.0), dtype=tf.float32)
+
 
 def combine_last_two_dimensions(x):
-  """Reshape x so that the last two dimension become one.
+    """Reshape x so that the last two dimension become one.
 
   Args:
     x: a Tensor with shape [..., a, b]
@@ -2364,12 +2536,13 @@ def combine_last_two_dimensions(x):
   Returns:
     a Tensor with shape [..., ab]
   """
-  x_shape = shape_list(x)
-  a, b = x_shape[-2:]
-  return tf.reshape(x, x_shape[:-2] + [a * b])
+    x_shape = shape_list(x)
+    a, b = x_shape[-2:]
+    return tf.reshape(x, x_shape[:-2] + [a * b])
+
 
 def split_heads(x, num_heads):
-  """Split channels (dimension 2) into multiple heads (becomes dimension 1).
+    """Split channels (dimension 2) into multiple heads (becomes dimension 1).
 
   Args:
     x: a Tensor with shape [batch, length, channels]
@@ -2378,10 +2551,11 @@ def split_heads(x, num_heads):
   Returns:
     a Tensor with shape [batch, num_heads, length, channels / num_heads]
   """
-  return tf.transpose(split_last_dimension(x, num_heads), [0, 2, 1, 3])
+    return tf.transpose(split_last_dimension(x, num_heads), [0, 2, 1, 3])
+
 
 def combine_heads(x):
-  """Inverse of split_heads.
+    """Inverse of split_heads.
 
   Args:
     x: a Tensor with shape [batch, num_heads, length, channels / num_heads]
@@ -2389,15 +2563,18 @@ def combine_heads(x):
   Returns:
     a Tensor with shape [batch, length, channels]
   """
-  return combine_last_two_dimensions(tf.transpose(x, [0, 2, 1, 3]))
+    return combine_last_two_dimensions(tf.transpose(x, [0, 2, 1, 3]))
 
-def compute_attention_component(antecedent,
-                                total_depth,
-                                filter_width=1,
-                                padding="VALID",
-                                name="c",
-                                vars_3d_num_heads=0):
-  """Computes attention compoenent (query, key or value).
+
+def compute_attention_component(
+    antecedent,
+    total_depth,
+    filter_width=1,
+    padding="VALID",
+    name="c",
+    vars_3d_num_heads=0
+):
+    """Computes attention compoenent (query, key or value).
 
   Args:
     antecedent: a Tensor with shape [batch, length, channels]
@@ -2411,38 +2588,43 @@ def compute_attention_component(antecedent,
   Returns:
     c : [batch, length, depth] tensor
   """
-  if vars_3d_num_heads > 0:
-    assert filter_width == 1
-    input_depth = antecedent.get_shape().as_list()[-1]
-    depth_per_head = total_depth // vars_3d_num_heads
-    initializer_stddev = input_depth ** -0.5
-    if "q" in name:
-      initializer_stddev *= depth_per_head ** -0.5
-    var = tf.get_variable(
-        name, [input_depth,
-               vars_3d_num_heads,
-               total_depth // vars_3d_num_heads],
-        initializer=tf.random_normal_initializer(stddev=initializer_stddev))
-    var = tf.cast(var, antecedent.dtype)
-    var = tf.reshape(var, [input_depth, total_depth])
-    return tf.tensordot(antecedent, var, axes=1)
-  if filter_width == 1:
-    return tf.layers.dense(
-        antecedent, total_depth, use_bias=False, name=name)
-  else:
-    return tf.nn.conv1d(
-        antecedent, total_depth, filter_width, padding=padding, name=name)
+    if vars_3d_num_heads > 0:
+        assert filter_width == 1
+        input_depth = antecedent.get_shape().as_list()[-1]
+        depth_per_head = total_depth // vars_3d_num_heads
+        initializer_stddev = input_depth**-0.5
+        if "q" in name:
+            initializer_stddev *= depth_per_head**-0.5
+        var = tf.get_variable(
+            name,
+            [input_depth, vars_3d_num_heads, total_depth // vars_3d_num_heads],
+            initializer=tf.random_normal_initializer(stddev=initializer_stddev)
+        )
+        var = tf.cast(var, antecedent.dtype)
+        var = tf.reshape(var, [input_depth, total_depth])
+        return tf.tensordot(antecedent, var, axes=1)
+    if filter_width == 1:
+        return tf.layers.dense(
+            antecedent, total_depth, use_bias=False, name=name
+        )
+    else:
+        return tf.nn.conv1d(
+            antecedent, total_depth, filter_width, padding=padding, name=name
+        )
 
-def compute_qkv(query_antecedent,
-                memory_antecedent,
-                total_key_depth,
-                total_value_depth,
-                q_filter_width=1,
-                kv_filter_width=1,
-                q_padding="VALID",
-                kv_padding="VALID",
-                vars_3d_num_heads=0):
-  """Computes query, key and value.
+
+def compute_qkv(
+    query_antecedent,
+    memory_antecedent,
+    total_key_depth,
+    total_value_depth,
+    q_filter_width=1,
+    kv_filter_width=1,
+    q_padding="VALID",
+    kv_padding="VALID",
+    vars_3d_num_heads=0
+):
+    """Computes query, key and value.
 
   Args:
     query_antecedent: a Tensor with shape [batch, length_q, channels]
@@ -2459,42 +2641,48 @@ def compute_qkv(query_antecedent,
   Returns:
     q, k, v : [batch, length, depth] tensors
   """
-  if memory_antecedent is None:
-    memory_antecedent = query_antecedent
-  q = compute_attention_component(
-      query_antecedent,
-      total_key_depth,
-      q_filter_width,
-      q_padding,
-      "q",
-      vars_3d_num_heads=vars_3d_num_heads)
-  k = compute_attention_component(
-      memory_antecedent,
-      total_key_depth,
-      kv_filter_width,
-      kv_padding,
-      "k",
-      vars_3d_num_heads=vars_3d_num_heads)
-  v = compute_attention_component(
-      memory_antecedent,
-      total_value_depth,
-      kv_filter_width,
-      kv_padding,
-      "v",
-      vars_3d_num_heads=vars_3d_num_heads)
-  return q, k, v
+    if memory_antecedent is None:
+        memory_antecedent = query_antecedent
+    q = compute_attention_component(
+        query_antecedent,
+        total_key_depth,
+        q_filter_width,
+        q_padding,
+        "q",
+        vars_3d_num_heads=vars_3d_num_heads
+    )
+    k = compute_attention_component(
+        memory_antecedent,
+        total_key_depth,
+        kv_filter_width,
+        kv_padding,
+        "k",
+        vars_3d_num_heads=vars_3d_num_heads
+    )
+    v = compute_attention_component(
+        memory_antecedent,
+        total_value_depth,
+        kv_filter_width,
+        kv_padding,
+        "v",
+        vars_3d_num_heads=vars_3d_num_heads
+    )
+    return q, k, v
 
-def dot_product_attention(q,
-                          k,
-                          v,
-                          bias,
-                          dropout_rate=0.0,
-                          image_shapes=None,
-                          name=None,
-                          make_image_summary=True,
-                          save_weights_to=None,
-                          dropout_broadcast_dims=None):
-  """Dot-product attention.
+
+def dot_product_attention(
+    q,
+    k,
+    v,
+    bias,
+    dropout_rate=0.0,
+    image_shapes=None,
+    name=None,
+    make_image_summary=True,
+    save_weights_to=None,
+    dropout_broadcast_dims=None
+):
+    """Dot-product attention.
 
   Args:
     q: Tensor with shape [..., length_q, depth_k].
@@ -2517,24 +2705,28 @@ def dot_product_attention(q,
   Returns:
     Tensor with shape [..., length_q, depth_v].
   """
-  with tf.variable_scope(name, default_name="dot_product_attention", values=[q, k, v]) as scope:
-    logits = tf.matmul(q, k, transpose_b=True)  # [..., length_q, length_kv]
-    if bias is not None:
-      bias = cast_like(bias, logits)
-      logits += bias
-    weights = tf.nn.softmax(logits, name="attention_weights")
-    if save_weights_to is not None:
-      save_weights_to[scope.name] = weights
-      save_weights_to[scope.name + "/logits"] = logits
-    # Drop out attention links for each head.
-    weights = dropout_with_broadcast_dims(
-        weights, 1.0 - dropout_rate, broadcast_dims=dropout_broadcast_dims)
-    if should_generate_summaries() and make_image_summary:
-      attention_image_summary(weights, image_shapes)
-    return tf.matmul(weights, v)
+    with tf.variable_scope(
+        name, default_name="dot_product_attention", values=[q, k, v]
+    ) as scope:
+        logits = tf.matmul(q, k, transpose_b=True)  # [..., length_q, length_kv]
+        if bias is not None:
+            bias = cast_like(bias, logits)
+            logits += bias
+        weights = tf.nn.softmax(logits, name="attention_weights")
+        if save_weights_to is not None:
+            save_weights_to[scope.name] = weights
+            save_weights_to[scope.name + "/logits"] = logits
+        # Drop out attention links for each head.
+        weights = dropout_with_broadcast_dims(
+            weights, 1.0 - dropout_rate, broadcast_dims=dropout_broadcast_dims
+        )
+        if should_generate_summaries() and make_image_summary:
+            attention_image_summary(weights, image_shapes)
+        return tf.matmul(weights, v)
+
 
 def local_attention_1d(q, k, v, block_length=128, filter_width=100, name=None):
-  """Strided block local self-attention.
+    """Strided block local self-attention.
 
   The sequence is divided into blocks of length block_length. Attention for a
   given query position can see all memory positions in the corresponding block
@@ -2551,104 +2743,118 @@ def local_attention_1d(q, k, v, block_length=128, filter_width=100, name=None):
   Returns:
     a Tensor of shape [batch, heads, length, depth_v]
   """
-  with tf.variable_scope(
-      name, default_name="local_self_attention_1d", values=[q, k, v]):
-    batch_size, num_heads, original_length, _ = shape_list(q)
-    depth_v = shape_list(v)[-1]
+    with tf.variable_scope(
+        name, default_name="local_self_attention_1d", values=[q, k, v]
+    ):
+        batch_size, num_heads, original_length, _ = shape_list(q)
+        depth_v = shape_list(v)[-1]
 
-    # Pad query, key, value to ensure multiple of corresponding lengths.
-    def pad_to_multiple(x, pad_length):
-      x_length = shape_list(x)[2]
-      return tf.pad(x, [[0, 0], [0, 0], [0, -x_length % pad_length], [0, 0]])
+        # Pad query, key, value to ensure multiple of corresponding lengths.
+        def pad_to_multiple(x, pad_length):
+            x_length = shape_list(x)[2]
+            return tf.pad(
+                x, [[0, 0], [0, 0], [0, -x_length % pad_length], [0, 0]]
+            )
 
-    def pad_l_and_r(x, pad_length):
-      return tf.pad(x, [[0, 0], [0, 0], [pad_length, pad_length], [0, 0]])
+        def pad_l_and_r(x, pad_length):
+            return tf.pad(x, [[0, 0], [0, 0], [pad_length, pad_length], [0, 0]])
 
-    q = pad_to_multiple(q, block_length)
-    k = pad_to_multiple(k, block_length)
-    v = pad_to_multiple(v, block_length)
+        q = pad_to_multiple(q, block_length)
+        k = pad_to_multiple(k, block_length)
+        v = pad_to_multiple(v, block_length)
 
-    # Set up query blocks.
-    new_q_shape = shape_list(q)
-    # q: [batch, heads, length // memory_block_size, memory_block_size, depth]
-    q = reshape_by_blocks(q, new_q_shape, block_length)
+        # Set up query blocks.
+        new_q_shape = shape_list(q)
+        # q: [batch, heads, length // memory_block_size, memory_block_size, depth]
+        q = reshape_by_blocks(q, new_q_shape, block_length)
 
-    # Set up key and value blocks.
-    # Get gather indices.
-    k = pad_l_and_r(k, filter_width)
-    v = pad_l_and_r(v, filter_width)
-    length = shape_list(k)[2]
-    full_filter_width = block_length + 2 * filter_width
-    indices = tf.range(0, length, delta=1, name="index_range")
-    indices = tf.reshape(indices, [1, -1, 1])  # [1, length, 1] for convs
-    kernel = tf.expand_dims(tf.eye(full_filter_width), axis=1)
-    gather_indices = tf.nn.conv1d(
-        tf.cast(indices, tf.float32),
-        kernel,
-        block_length,
-        padding="VALID",
-        name="gather_conv")
+        # Set up key and value blocks.
+        # Get gather indices.
+        k = pad_l_and_r(k, filter_width)
+        v = pad_l_and_r(v, filter_width)
+        length = shape_list(k)[2]
+        full_filter_width = block_length + 2 * filter_width
+        indices = tf.range(0, length, delta=1, name="index_range")
+        indices = tf.reshape(indices, [1, -1, 1])  # [1, length, 1] for convs
+        kernel = tf.expand_dims(tf.eye(full_filter_width), axis=1)
+        gather_indices = tf.nn.conv1d(
+            tf.cast(indices, tf.float32),
+            kernel,
+            block_length,
+            padding="VALID",
+            name="gather_conv"
+        )
 
-    gather_indices = tf.squeeze(tf.cast(gather_indices, tf.int32), axis=0)
+        gather_indices = tf.squeeze(tf.cast(gather_indices, tf.int32), axis=0)
 
-    # Reshape keys and values to [length, batch, heads, dim] for gather. Then
-    # reshape to [batch, heads, blocks, block_length + filter_width, dim].
-    k_t = tf.transpose(k, [2, 0, 1, 3])
-    k_new = tf.gather(k_t, gather_indices)
-    k_new = tf.transpose(k_new, [2, 3, 0, 1, 4])
+        # Reshape keys and values to [length, batch, heads, dim] for gather. Then
+        # reshape to [batch, heads, blocks, block_length + filter_width, dim].
+        k_t = tf.transpose(k, [2, 0, 1, 3])
+        k_new = tf.gather(k_t, gather_indices)
+        k_new = tf.transpose(k_new, [2, 3, 0, 1, 4])
 
-    attention_bias = tf.expand_dims(embedding_to_padding(k_new) * -1e9, axis=-2)
+        attention_bias = tf.expand_dims(
+            embedding_to_padding(k_new) * -1e9, axis=-2
+        )
 
-    v_t = tf.transpose(v, [2, 0, 1, 3])
-    v_new = tf.gather(v_t, gather_indices)
-    v_new = tf.transpose(v_new, [2, 3, 0, 1, 4])
+        v_t = tf.transpose(v, [2, 0, 1, 3])
+        v_new = tf.gather(v_t, gather_indices)
+        v_new = tf.transpose(v_new, [2, 3, 0, 1, 4])
 
-    output = dot_product_attention(
-        q, # [batch, heads, blocks, memory_block_size, depth_k]
-        k_new, # [batch, heads, blocks, block_length + 2*filter_width, depth_k]
-        v_new, # [batch, heads, blocks, block_length + 2*filter_width, depth_v]
-        attention_bias,
-        dropout_rate=0.,
-        name="local_1d",
-        make_image_summary=False)
-    # output: [batch, heads, blocks, memory_block_size, depth_v]
-    output = tf.reshape(output, [batch_size, num_heads, -1, depth_v])
+        output = dot_product_attention(
+            q,  # [batch, heads, blocks, memory_block_size, depth_k]
+            k_new,  # [batch, heads, blocks, block_length + 2*filter_width, depth_k]
+            v_new,  # [batch, heads, blocks, block_length + 2*filter_width, depth_v]
+            attention_bias,
+            dropout_rate=0.,
+            name="local_1d",
+            make_image_summary=False
+        )
+        # output: [batch, heads, blocks, memory_block_size, depth_v]
+        output = tf.reshape(output, [batch_size, num_heads, -1, depth_v])
 
-    # Remove the padding if introduced.
-    output = tf.slice(output, [0, 0, 0, 0], [-1, -1, original_length, -1])
-    output.set_shape([None if isinstance(dim, tf.Tensor) else dim for dim in
-                      (batch_size, num_heads, original_length, depth_v)])
-    return output
+        # Remove the padding if introduced.
+        output = tf.slice(output, [0, 0, 0, 0], [-1, -1, original_length, -1])
+        output.set_shape(
+            [
+                None if isinstance(dim, tf.Tensor) else dim
+                for dim in (batch_size, num_heads, original_length, depth_v)
+            ]
+        )
+        return output
 
-def multihead_attention(query_antecedent,
-                        memory_antecedent,
-                        bias,
-                        total_key_depth,
-                        total_value_depth,
-                        output_depth,
-                        num_heads,
-                        dropout_rate,
-                        shared_rel=False,
-                        max_relative_position=None,
-                        image_shapes=None,
-                        attention_type="dot_product",
-                        block_length=128,
-                        filter_width=128,
-                        q_filter_width=1,
-                        kv_filter_width=1,
-                        q_padding="VALID",
-                        kv_padding="VALID",
-                        cache=None,
-                        gap_size=0,
-                        num_memory_blocks=2,
-                        name="multihead_attention",
-                        save_weights_to=None,
-                        make_image_summary=True,
-                        dropout_broadcast_dims=None,
-                        max_length=None,
-                        vars_3d=False,
-                        **kwargs):
-  """Multihead scaled-dot-product attention with input/output transformations.
+
+def multihead_attention(
+    query_antecedent,
+    memory_antecedent,
+    bias,
+    total_key_depth,
+    total_value_depth,
+    output_depth,
+    num_heads,
+    dropout_rate,
+    shared_rel=False,
+    max_relative_position=None,
+    image_shapes=None,
+    attention_type="dot_product",
+    block_length=128,
+    filter_width=128,
+    q_filter_width=1,
+    kv_filter_width=1,
+    q_padding="VALID",
+    kv_padding="VALID",
+    cache=None,
+    gap_size=0,
+    num_memory_blocks=2,
+    name="multihead_attention",
+    save_weights_to=None,
+    make_image_summary=True,
+    dropout_broadcast_dims=None,
+    max_length=None,
+    vars_3d=False,
+    **kwargs
+):
+    """Multihead scaled-dot-product attention with input/output transformations.
 
   Args:
     query_antecedent: a Tensor with shape [batch, length_q, channels]
@@ -2720,104 +2926,141 @@ def multihead_attention(query_antecedent,
     ValueError: if the key depth or value depth are not divisible by the
       number of attention heads.
   """
-  if total_key_depth % num_heads != 0:
-    raise ValueError("Key depth (%d) must be divisible by the number of "
-                     "attention heads (%d)." % (total_key_depth, num_heads))
-  if total_value_depth % num_heads != 0:
-    raise ValueError("Value depth (%d) must be divisible by the number of "
-                     "attention heads (%d)." % (total_value_depth, num_heads))
-  vars_3d_num_heads = num_heads if vars_3d else 0
-  with tf.variable_scope(name, default_name="multihead_attention",
-                         values=[query_antecedent, memory_antecedent]):
+    if total_key_depth % num_heads != 0:
+        raise ValueError(
+            "Key depth (%d) must be divisible by the number of "
+            "attention heads (%d)." % (total_key_depth, num_heads)
+        )
+    if total_value_depth % num_heads != 0:
+        raise ValueError(
+            "Value depth (%d) must be divisible by the number of "
+            "attention heads (%d)." % (total_value_depth, num_heads)
+        )
+    vars_3d_num_heads = num_heads if vars_3d else 0
+    with tf.variable_scope(
+        name,
+        default_name="multihead_attention",
+        values=[query_antecedent, memory_antecedent]
+    ):
 
-    if cache is None or memory_antecedent is None:
-      q, k, v = compute_qkv(query_antecedent, memory_antecedent,
-                            total_key_depth, total_value_depth, q_filter_width,
-                            kv_filter_width, q_padding, kv_padding,
-                            vars_3d_num_heads=vars_3d_num_heads)
-    if cache is not None:
-      if attention_type != "dot_product":
-        # TODO(petershaw): Support caching when using relative position
-        # representations, i.e. "dot_product_relative" attention.
-        raise NotImplementedError(
-            "Caching is not guaranteed to work with attention types other than"
-            " dot_product.")
-      if bias is None:
-        raise ValueError("Bias required for caching. See function docstring "
-                         "for details.")
+        if cache is None or memory_antecedent is None:
+            q, k, v = compute_qkv(
+                query_antecedent,
+                memory_antecedent,
+                total_key_depth,
+                total_value_depth,
+                q_filter_width,
+                kv_filter_width,
+                q_padding,
+                kv_padding,
+                vars_3d_num_heads=vars_3d_num_heads
+            )
+        if cache is not None:
+            if attention_type != "dot_product":
+                # TODO(petershaw): Support caching when using relative position
+                # representations, i.e. "dot_product_relative" attention.
+                raise NotImplementedError(
+                    "Caching is not guaranteed to work with attention types other than"
+                    " dot_product."
+                )
+            if bias is None:
+                raise ValueError(
+                    "Bias required for caching. See function docstring "
+                    "for details."
+                )
 
-      if memory_antecedent is not None:
-        # Encoder-Decoder Attention Cache
-        q = compute_attention_component(query_antecedent, total_key_depth,
-                                        q_filter_width, q_padding, "q",
-                                        vars_3d_num_heads=vars_3d_num_heads)
-        k = cache["k_encdec"]
-        v = cache["v_encdec"]
-      else:
-        k = split_heads(k, num_heads)
-        v = split_heads(v, num_heads)
-        decode_loop_step = kwargs.get("decode_loop_step")
-        if decode_loop_step is None:
-          k = cache["k"] = tf.concat([cache["k"], k], axis=2)
-          v = cache["v"] = tf.concat([cache["v"], v], axis=2)
+            if memory_antecedent is not None:
+                # Encoder-Decoder Attention Cache
+                q = compute_attention_component(
+                    query_antecedent,
+                    total_key_depth,
+                    q_filter_width,
+                    q_padding,
+                    "q",
+                    vars_3d_num_heads=vars_3d_num_heads
+                )
+                k = cache["k_encdec"]
+                v = cache["v_encdec"]
+            else:
+                k = split_heads(k, num_heads)
+                v = split_heads(v, num_heads)
+                decode_loop_step = kwargs.get("decode_loop_step")
+                if decode_loop_step is None:
+                    k = cache["k"] = tf.concat([cache["k"], k], axis=2)
+                    v = cache["v"] = tf.concat([cache["v"], v], axis=2)
+                else:
+                    # Inplace update is required for inference on TPU.
+                    # Inplace_ops only supports inplace_update on the first dimension.
+                    # The performance of current implementation is better than updating
+                    # the tensor by adding the result of matmul(one_hot,
+                    # update_in_current_step)
+                    tmp_k = tf.transpose(cache["k"], perm=[2, 0, 1, 3])
+                    tmp_k = inplace_ops.alias_inplace_update(
+                        tmp_k, decode_loop_step, tf.squeeze(k, axis=2)
+                    )
+                    k = cache["k"] = tf.transpose(tmp_k, perm=[1, 2, 0, 3])
+                    tmp_v = tf.transpose(cache["v"], perm=[2, 0, 1, 3])
+                    tmp_v = inplace_ops.alias_inplace_update(
+                        tmp_v, decode_loop_step, tf.squeeze(v, axis=2)
+                    )
+                    v = cache["v"] = tf.transpose(tmp_v, perm=[1, 2, 0, 3])
+
+        # [batch, num_heads, length, channels / num_heads]
+        q = split_heads(q, num_heads)
+        if cache is None:
+            k = split_heads(k, num_heads)
+            v = split_heads(v, num_heads)
+
+        key_depth_per_head = total_key_depth // num_heads
+        if not vars_3d:
+            q *= key_depth_per_head**-0.5
+
+        additional_returned_value = None
+        if callable(
+            attention_type
+        ):  # Generic way to extend multihead_attention
+            x = attention_type(q, k, v, **kwargs)
+            if isinstance(x, tuple):
+                x, additional_returned_value = x  # Unpack
+        elif attention_type == "dot_product":
+            x = dot_product_attention(
+                q,
+                k,
+                v,
+                bias,
+                dropout_rate,
+                image_shapes,
+                save_weights_to=save_weights_to,
+                make_image_summary=make_image_summary,
+                dropout_broadcast_dims=dropout_broadcast_dims
+            )
+        elif attention_type == "local_unmasked":
+            x = local_attention_1d(
+                q, k, v, block_length=block_length, filter_width=filter_width
+            )
+        x = combine_heads(x)
+
+        # Set last dim specifically.
+        x.set_shape(x.shape.as_list()[:-1] + [total_value_depth])
+
+        if vars_3d:
+            o_var = tf.get_variable(
+                "o", [num_heads, total_value_depth // num_heads, output_depth]
+            )
+            o_var = tf.cast(o_var, x.dtype)
+            o_var = tf.reshape(o_var, [total_value_depth, output_depth])
+            x = tf.tensordot(x, o_var, axes=1)
         else:
-          # Inplace update is required for inference on TPU.
-          # Inplace_ops only supports inplace_update on the first dimension.
-          # The performance of current implementation is better than updating
-          # the tensor by adding the result of matmul(one_hot,
-          # update_in_current_step)
-          tmp_k = tf.transpose(cache["k"], perm=[2, 0, 1, 3])
-          tmp_k = inplace_ops.alias_inplace_update(
-              tmp_k, decode_loop_step, tf.squeeze(k, axis=2))
-          k = cache["k"] = tf.transpose(tmp_k, perm=[1, 2, 0, 3])
-          tmp_v = tf.transpose(cache["v"], perm=[2, 0, 1, 3])
-          tmp_v = inplace_ops.alias_inplace_update(
-              tmp_v, decode_loop_step, tf.squeeze(v, axis=2))
-          v = cache["v"] = tf.transpose(tmp_v, perm=[1, 2, 0, 3])
+            x = tf.layers.dense(
+                x, output_depth, use_bias=False, name="output_transform"
+            )
+        if additional_returned_value is not None:
+            return x, additional_returned_value
+        return x
 
-    # [batch, num_heads, length, channels / num_heads]
-    q = split_heads(q, num_heads)
-    if cache is None:
-      k = split_heads(k, num_heads)
-      v = split_heads(v, num_heads)
-
-    key_depth_per_head = total_key_depth // num_heads
-    if not vars_3d:
-      q *= key_depth_per_head**-0.5
-
-    additional_returned_value = None
-    if callable(attention_type):  # Generic way to extend multihead_attention
-      x = attention_type(q, k, v, **kwargs)
-      if isinstance(x, tuple):
-        x, additional_returned_value = x  # Unpack
-    elif attention_type == "dot_product":
-      x = dot_product_attention(q, k, v, bias, dropout_rate, image_shapes,
-                                save_weights_to=save_weights_to,
-                                make_image_summary=make_image_summary,
-                                dropout_broadcast_dims=dropout_broadcast_dims)
-    elif attention_type == "local_unmasked":
-      x = local_attention_1d(
-          q, k, v, block_length=block_length, filter_width=filter_width)
-    x = combine_heads(x)
-
-    # Set last dim specifically.
-    x.set_shape(x.shape.as_list()[:-1] + [total_value_depth])
-
-    if vars_3d:
-      o_var = tf.get_variable(
-          "o", [num_heads, total_value_depth // num_heads, output_depth])
-      o_var = tf.cast(o_var, x.dtype)
-      o_var = tf.reshape(o_var, [total_value_depth, output_depth])
-      x = tf.tensordot(x, o_var, axes=1)
-    else:
-      x = tf.layers.dense(
-          x, output_depth, use_bias=False, name="output_transform")
-    if additional_returned_value is not None:
-      return x, additional_returned_value
-    return x
 
 def attention_bias_ignore_padding(memory_padding):
-  """Create an bias tensor to be added to attention logits.
+    """Create an bias tensor to be added to attention logits.
 
   Args:
     memory_padding: a float `Tensor` with shape [batch, memory_length].
@@ -2825,91 +3068,116 @@ def attention_bias_ignore_padding(memory_padding):
   Returns:
     a `Tensor` with shape [batch, 1, 1, memory_length].
   """
-  ret = memory_padding * _NEG_INF
-  return tf.expand_dims(tf.expand_dims(ret, axis=1), axis=1)
+    ret = memory_padding * _NEG_INF
+    return tf.expand_dims(tf.expand_dims(ret, axis=1), axis=1)
+
 
 # tensor2tensor end
 
+
 # tensor2tensor Normalization start
 def layer_norm(x, filters=None, epsilon=1e-6, name=None, reuse=None):
-  """Layer normalize the tensor x, averaging over the last dimension."""
-  if filters is None:
-    filters = shape_list(x)[-1]
-  with tf.variable_scope(name, default_name="layer_norm", values=[x], reuse=reuse):
-    scale = tf.get_variable("scale", [filters], initializer=tf.ones_initializer())
-    bias = tf.get_variable("bias", [filters], initializer=tf.zeros_initializer())
-    epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
+    """Layer normalize the tensor x, averaging over the last dimension."""
+    if filters is None:
+        filters = shape_list(x)[-1]
+    with tf.variable_scope(
+        name, default_name="layer_norm", values=[x], reuse=reuse
+    ):
+        scale = tf.get_variable(
+            "scale", [filters], initializer=tf.ones_initializer()
+        )
+        bias = tf.get_variable(
+            "bias", [filters], initializer=tf.zeros_initializer()
+        )
+        epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
 
-    mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
-    variance = tf.reduce_mean(tf.square(x - mean), axis=[-1], keepdims=True)
-    norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
-    return norm_x * scale + bias
+        mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
+        variance = tf.reduce_mean(tf.square(x - mean), axis=[-1], keepdims=True)
+        norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
+        return norm_x * scale + bias
+
 
 def group_norm(x, filters=None, num_groups=8, epsilon=1e-5, name=None):
-  """Group normalization as in https://arxiv.org/abs/1803.08494."""
-  x_shape = shape_list(x)
-  if filters is None:
-    filters = x_shape[-1]
-  assert len(x_shape) == 4
-  assert filters % num_groups == 0
-  # Prepare variables.
-  with tf.variable_scope(name, default_name="group_norm", values=[x]):
-    scale = tf.get_variable(
-        "scale", [filters], initializer=tf.ones_initializer())
-    bias = tf.get_variable(
-        "bias", [filters], initializer=tf.zeros_initializer())
-    epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
-    # Reshape and compute group norm.
-    x = tf.reshape(x, x_shape[:-1] + [num_groups, filters // num_groups])
-    # Calculate mean and variance on heights, width, channels (not groups).
-    mean, variance = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
-    norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
-    return tf.reshape(norm_x, x_shape) * scale + bias
+    """Group normalization as in https://arxiv.org/abs/1803.08494."""
+    x_shape = shape_list(x)
+    if filters is None:
+        filters = x_shape[-1]
+    assert len(x_shape) == 4
+    assert filters % num_groups == 0
+    # Prepare variables.
+    with tf.variable_scope(name, default_name="group_norm", values=[x]):
+        scale = tf.get_variable(
+            "scale", [filters], initializer=tf.ones_initializer()
+        )
+        bias = tf.get_variable(
+            "bias", [filters], initializer=tf.zeros_initializer()
+        )
+        epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
+        # Reshape and compute group norm.
+        x = tf.reshape(x, x_shape[:-1] + [num_groups, filters // num_groups])
+        # Calculate mean and variance on heights, width, channels (not groups).
+        mean, variance = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
+        norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
+        return tf.reshape(norm_x, x_shape) * scale + bias
+
 
 def noam_norm(x, epsilon=1.0, name=None):
-  """One version of layer normalization."""
-  with tf.variable_scope(name, default_name="noam_norm", values=[x]):
-    shape = x.get_shape()
-    ndims = len(shape)
-    return (tf.nn.l2_normalize(x, ndims - 1, epsilon=epsilon) * tf.sqrt(
-        tf.cast(shape[-1], dtype=tf.float32)))
+    """One version of layer normalization."""
+    with tf.variable_scope(name, default_name="noam_norm", values=[x]):
+        shape = x.get_shape()
+        ndims = len(shape)
+        return (
+            tf.nn.l2_normalize(x, ndims - 1, epsilon=epsilon) *
+            tf.sqrt(tf.cast(shape[-1], dtype=tf.float32))
+        )
+
 
 def l2_layer_norm(x, filters=None, epsilon=1e-6, name=None, reuse=None):
-  """Layer normalization with l2 norm."""
-  if filters is None:
-    filters = shape_list(x)[-1]
-  with tf.variable_scope(name, default_name="l2_layer_norm", values=[x], reuse=reuse):
-    scale = tf.get_variable(
-        "scale", [filters], initializer=tf.ones_initializer())
-    bias = tf.get_variable(
-        "bias", [filters], initializer=tf.zeros_initializer())
-    epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
-    mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
-    l2norm = tf.reduce_sum(tf.square(x - mean), axis=[-1], keepdims=True)
-    norm_x = (x - mean) * tf.rsqrt(l2norm + epsilon)
-    return norm_x * scale + bias
+    """Layer normalization with l2 norm."""
+    if filters is None:
+        filters = shape_list(x)[-1]
+    with tf.variable_scope(
+        name, default_name="l2_layer_norm", values=[x], reuse=reuse
+    ):
+        scale = tf.get_variable(
+            "scale", [filters], initializer=tf.ones_initializer()
+        )
+        bias = tf.get_variable(
+            "bias", [filters], initializer=tf.zeros_initializer()
+        )
+        epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
+        mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
+        l2norm = tf.reduce_sum(tf.square(x - mean), axis=[-1], keepdims=True)
+        norm_x = (x - mean) * tf.rsqrt(l2norm + epsilon)
+        return norm_x * scale + bias
+
 
 def apply_norm(x, norm_type, depth, epsilon):
-  """Apply Normalization."""
-  if norm_type == "layer":
-    return layer_norm(x, filters=depth, epsilon=epsilon)
-  if norm_type == "group":
-    return group_norm(x, filters=depth, epsilon=epsilon)
-  if norm_type == "batch":
-    return tf.layers.batch_normalization(x, epsilon=epsilon)
-  if norm_type == "noam":
-    return noam_norm(x, epsilon)
-  if norm_type == "l2layer":
-    return l2_layer_norm(x, filters=depth, epsilon=epsilon)
-  if norm_type == "none":
-    return x
-  raise ValueError("Parameter normalizer_fn must be one of: 'layer', 'batch',"
-                   "'noam', 'lr', 'none'.")
+    """Apply Normalization."""
+    if norm_type == "layer":
+        return layer_norm(x, filters=depth, epsilon=epsilon)
+    if norm_type == "group":
+        return group_norm(x, filters=depth, epsilon=epsilon)
+    if norm_type == "batch":
+        return tf.layers.batch_normalization(x, epsilon=epsilon)
+    if norm_type == "noam":
+        return noam_norm(x, epsilon)
+    if norm_type == "l2layer":
+        return l2_layer_norm(x, filters=depth, epsilon=epsilon)
+    if norm_type == "none":
+        return x
+    raise ValueError(
+        "Parameter normalizer_fn must be one of: 'layer', 'batch',"
+        "'noam', 'lr', 'none'."
+    )
+
+
 # tensor2tensor Normalization end
+
 
 # Correct Layer Norm LSTM start
 def _norm(g, b, inp, scope, center=True):
-  """layer normalize helper:
+    """layer normalize helper:
   Args:
     g: float, layer normalization scale (gamma) initial value.
     b: float, layer normalization offset (beta) initial value.
@@ -2917,18 +3185,21 @@ def _norm(g, b, inp, scope, center=True):
     center: boolean. If True (default), add layer normalization offset (beta)
       after normalization.
   """
-  shape = inp.get_shape()[-1:]
-  gamma_init = tf.constant_initializer(g)
-  beta_init = tf.constant_initializer(b)
-  with tf.variable_scope(scope):
-    tf.get_variable("gamma", shape=shape, initializer=gamma_init)
-    if center:
-      tf.get_variable("beta", shape=shape, initializer=beta_init)
-  normalized = tf.contrib.layers.layer_norm(inp, center=center, reuse=True, scope=scope)
-  return normalized
+    shape = inp.get_shape()[-1:]
+    gamma_init = tf.constant_initializer(g)
+    beta_init = tf.constant_initializer(b)
+    with tf.variable_scope(scope):
+        tf.get_variable("gamma", shape=shape, initializer=gamma_init)
+        if center:
+            tf.get_variable("beta", shape=shape, initializer=beta_init)
+    normalized = tf.contrib.layers.layer_norm(
+        inp, center=center, reuse=True, scope=scope
+    )
+    return normalized
+
 
 class LayerNormLSTMCellv2(tf.nn.rnn_cell.RNNCell):
-  """Long short-term memory unit (LSTM) recurrent network cell.
+    """Long short-term memory unit (LSTM) recurrent network cell.
   The default non-peephole implementation is based on:
     http://www.bioinf.jku.at/publications/older/2604.pdf
   S. Hochreiter and J. Schmidhuber.
@@ -2946,22 +3217,23 @@ class LayerNormLSTMCellv2(tf.nn.rnn_cell.RNNCell):
   Jimmy Lei Ba, Jamie Ryan Kiros, Geoffrey E. Hinton
   and is applied before the internal nonlinearities.
   """
-
-  def __init__(self,
-               num_units,
-               use_peepholes=False,
-               cell_clip=None,
-               initializer=None,
-               num_proj=None,
-               proj_clip=None,
-               forget_bias=1.0,
-               activation=None,
-               layer_norm=True,
-               layer_norm_columns=False,
-               norm_gain=1.0,
-               norm_shift=0.0,
-               reuse=None):
-    """Initialize the parameters for an LSTM cell.
+    def __init__(
+        self,
+        num_units,
+        use_peepholes=False,
+        cell_clip=None,
+        initializer=None,
+        num_proj=None,
+        proj_clip=None,
+        forget_bias=1.0,
+        activation=None,
+        layer_norm=True,
+        layer_norm_columns=False,
+        norm_gain=1.0,
+        norm_shift=0.0,
+        reuse=None
+    ):
+        """Initialize the parameters for an LSTM cell.
     Args:
       num_units: int, The number of units in the LSTM cell
       use_peepholes: bool, set True to enable diagonal/peephole connections.
@@ -2996,43 +3268,49 @@ class LayerNormLSTMCellv2(tf.nn.rnn_cell.RNNCell):
       When restoring from CudnnLSTM-trained checkpoints, must use
       CudnnCompatibleLSTMCell instead.
     """
-    super(LayerNormLSTMCellv2, self).__init__(_reuse=reuse)
+        super(LayerNormLSTMCellv2, self).__init__(_reuse=reuse)
 
-    self._num_units = num_units
-    self._use_peepholes = use_peepholes
-    self._cell_clip = cell_clip
-    self._initializer = initializer
-    self._num_proj = num_proj
-    self._proj_clip = proj_clip
-    self._forget_bias = forget_bias
-    self._activation = activation or tf.tanh
-    self._layer_norm = layer_norm
-    self._layer_norm_columns = layer_norm_columns
-    self._norm_gain = norm_gain
-    self._norm_shift = norm_shift
+        self._num_units = num_units
+        self._use_peepholes = use_peepholes
+        self._cell_clip = cell_clip
+        self._initializer = initializer
+        self._num_proj = num_proj
+        self._proj_clip = proj_clip
+        self._forget_bias = forget_bias
+        self._activation = activation or tf.tanh
+        self._layer_norm = layer_norm
+        self._layer_norm_columns = layer_norm_columns
+        self._norm_gain = norm_gain
+        self._norm_shift = norm_shift
 
-    if num_proj:
-      self._state_size = (tf.nn.rnn_cell.LSTMStateTuple(num_units, num_proj))
-      self._output_size = num_proj
-    else:
-      self._state_size = (tf.nn.rnn_cell.LSTMStateTuple(num_units, num_units))
-      self._output_size = num_units
+        if num_proj:
+            self._state_size = (
+                tf.nn.rnn_cell.LSTMStateTuple(num_units, num_proj)
+            )
+            self._output_size = num_proj
+        else:
+            self._state_size = (
+                tf.nn.rnn_cell.LSTMStateTuple(num_units, num_units)
+            )
+            self._output_size = num_units
 
-  @property
-  def state_size(self):
-    return self._state_size
+    @property
+    def state_size(self):
+        return self._state_size
 
-  @property
-  def output_size(self):
-    return self._output_size
+    @property
+    def output_size(self):
+        return self._output_size
 
-  def _linear(self,
-              args,
-              output_size,
-              bias,
-              bias_initializer=None,
-              kernel_initializer=None):
-    """Linear map: sum_i(args[i] * W[i]), where W[i] is a Variable.
+    def _linear(
+        self,
+        args,
+        output_size,
+        bias,
+        bias_initializer=None,
+        kernel_initializer=None
+    ):
+        """Linear map: sum_i(args[i] * W[i]), where W[i] is a Variable.
     Args:
       args: a 2D Tensor or a list of 2D, batch x n, Tensors.
       output_size: int, second dimension of W[i].
@@ -3048,56 +3326,71 @@ class LayerNormLSTMCellv2(tf.nn.rnn_cell.RNNCell):
     Raises:
       ValueError: if some of the arguments has unspecified or wrong shape.
     """
-    if args is None or (is_sequence(args) and not args):
-      raise ValueError("`args` must be specified")
-    if not is_sequence(args):
-      args = [args]
-    # Calculate the total size of arguments on dimension 1.
-    total_arg_size = 0
-    shapes = [a.get_shape() for a in args]
-    for shape in shapes:
-      if shape.ndims != 2:
-        raise ValueError("linear is expecting 2D arguments: %s" % shapes)
-      if shape[1].value is None:
-        raise ValueError("linear expects shape[1] to be provided for shape %s, "
-                         "but saw %s" % (shape, shape[1]))
-      else:
-        total_arg_size += shape[1].value
+        if args is None or (is_sequence(args) and not args):
+            raise ValueError("`args` must be specified")
+        if not is_sequence(args):
+            args = [args]
+        # Calculate the total size of arguments on dimension 1.
+        total_arg_size = 0
+        shapes = [a.get_shape() for a in args]
+        for shape in shapes:
+            if shape.ndims != 2:
+                raise ValueError(
+                    "linear is expecting 2D arguments: %s" % shapes
+                )
+            if shape[1].value is None:
+                raise ValueError(
+                    "linear expects shape[1] to be provided for shape %s, "
+                    "but saw %s" % (shape, shape[1])
+                )
+            else:
+                total_arg_size += shape[1].value
 
-    dtype = [a.dtype for a in args][0]
+        dtype = [a.dtype for a in args][0]
 
-    # Now the computation.
-    scope = tf.get_variable_scope()
-    with tf.variable_scope(scope) as outer_scope:
-      kernel = tf.get_variable(
-          "kernel", [total_arg_size, output_size],
-          dtype=dtype,
-          initializer=kernel_initializer)
-      if self._layer_norm and not self._layer_norm_columns:
-        axis_sizes = [shape[1].value for shape in shapes]
-        weights = tf.split(kernel, axis_sizes)
-        res = [tf.matmul(arg, w) for arg, w in zip(args, weights)]
-        # Don't add layer norm offset because we add a bias.
-        res = [_norm(self._norm_gain, self._norm_shift, out,
-                     str(i), center=False) for i, out in enumerate(res)]
-        res = sum(res)
-      else:
-        res = tf.matmul(tf.concat(args, 1), kernel)
-      if not bias or (self._layer_norm and self._layer_norm_columns):
+        # Now the computation.
+        scope = tf.get_variable_scope()
+        with tf.variable_scope(scope) as outer_scope:
+            kernel = tf.get_variable(
+                "kernel", [total_arg_size, output_size],
+                dtype=dtype,
+                initializer=kernel_initializer
+            )
+            if self._layer_norm and not self._layer_norm_columns:
+                axis_sizes = [shape[1].value for shape in shapes]
+                weights = tf.split(kernel, axis_sizes)
+                res = [tf.matmul(arg, w) for arg, w in zip(args, weights)]
+                # Don't add layer norm offset because we add a bias.
+                res = [
+                    _norm(
+                        self._norm_gain,
+                        self._norm_shift,
+                        out,
+                        str(i),
+                        center=False
+                    ) for i, out in enumerate(res)
+                ]
+                res = sum(res)
+            else:
+                res = tf.matmul(tf.concat(args, 1), kernel)
+            if not bias or (self._layer_norm and self._layer_norm_columns):
+                return res
+            with tf.variable_scope(outer_scope) as inner_scope:
+                inner_scope.set_partitioner(None)
+                if bias_initializer is None:
+                    bias_initializer = tf.constant_initializer(0.0, dtype=dtype)
+                biases = tf.get_variable(
+                    "bias", [output_size],
+                    dtype=dtype,
+                    initializer=bias_initializer
+                )
+
+        res = tf.nn.bias_add(res, biases)
+
         return res
-      with tf.variable_scope(outer_scope) as inner_scope:
-        inner_scope.set_partitioner(None)
-        if bias_initializer is None:
-          bias_initializer = tf.constant_initializer(0.0, dtype=dtype)
-        biases = tf.get_variable(
-            "bias", [output_size], dtype=dtype, initializer=bias_initializer)
 
-    res = tf.nn.bias_add(res, biases)
-
-    return res
-
-  def call(self, inputs, state):
-    """Run one step of LSTM.
+    def call(self, inputs, state):
+        """Run one step of LSTM.
     Args:
       inputs: input Tensor, 2D, batch x num_units.
       state: this must be a tuple of state Tensors,
@@ -3116,75 +3409,89 @@ class LayerNormLSTMCellv2(tf.nn.rnn_cell.RNNCell):
       ValueError: If input size cannot be inferred from inputs via
         static shape inference.
     """
-    sigmoid = tf.sigmoid
+        sigmoid = tf.sigmoid
 
-    (c_prev, m_prev) = state
+        (c_prev, m_prev) = state
 
-    dtype = inputs.dtype
-    input_size = inputs.get_shape().with_rank(2)[1]
-    if input_size.value is None:
-      raise ValueError("Could not infer input size from inputs.get_shape()[-1]")
-    scope = tf.get_variable_scope()
-    with tf.variable_scope(scope, initializer=self._initializer) as unit_scope:
+        dtype = inputs.dtype
+        input_size = inputs.get_shape().with_rank(2)[1]
+        if input_size.value is None:
+            raise ValueError(
+                "Could not infer input size from inputs.get_shape()[-1]"
+            )
+        scope = tf.get_variable_scope()
+        with tf.variable_scope(
+            scope, initializer=self._initializer
+        ) as unit_scope:
 
-      # i = input_gate, j = new_input, f = forget_gate, o = output_gate
-      lstm_matrix = self._linear(
-          [inputs, m_prev],
-          4 * self._num_units,
-          bias=True,
-          bias_initializer=None)
-      i, j, f, o = tf.split(
-          value=lstm_matrix, num_or_size_splits=4, axis=1)
+            # i = input_gate, j = new_input, f = forget_gate, o = output_gate
+            lstm_matrix = self._linear(
+                [inputs, m_prev],
+                4 * self._num_units,
+                bias=True,
+                bias_initializer=None
+            )
+            i, j, f, o = tf.split(
+                value=lstm_matrix, num_or_size_splits=4, axis=1
+            )
 
-      if self._layer_norm and self._layer_norm_columns:
-        i = _norm(self._norm_gain, self._norm_shift, i, "input")
-        j = _norm(self._norm_gain, self._norm_shift, j, "transform")
-        f = _norm(self._norm_gain, self._norm_shift, f, "forget")
-        o = _norm(self._norm_gain, self._norm_shift, o, "output")
+            if self._layer_norm and self._layer_norm_columns:
+                i = _norm(self._norm_gain, self._norm_shift, i, "input")
+                j = _norm(self._norm_gain, self._norm_shift, j, "transform")
+                f = _norm(self._norm_gain, self._norm_shift, f, "forget")
+                o = _norm(self._norm_gain, self._norm_shift, o, "output")
 
-      # Diagonal connections
-      if self._use_peepholes:
-        with tf.variable_scope(unit_scope):
-          w_f_diag = tf.get_variable(
-              "w_f_diag", shape=[self._num_units], dtype=dtype)
-          w_i_diag = tf.get_variable(
-              "w_i_diag", shape=[self._num_units], dtype=dtype)
-          w_o_diag = tf.get_variable(
-              "w_o_diag", shape=[self._num_units], dtype=dtype)
+            # Diagonal connections
+            if self._use_peepholes:
+                with tf.variable_scope(unit_scope):
+                    w_f_diag = tf.get_variable(
+                        "w_f_diag", shape=[self._num_units], dtype=dtype
+                    )
+                    w_i_diag = tf.get_variable(
+                        "w_i_diag", shape=[self._num_units], dtype=dtype
+                    )
+                    w_o_diag = tf.get_variable(
+                        "w_o_diag", shape=[self._num_units], dtype=dtype
+                    )
 
-      if self._use_peepholes:
-        c = (
-            sigmoid(f + self._forget_bias + w_f_diag * c_prev) * c_prev +
-            sigmoid(i + w_i_diag * c_prev) * self._activation(j))
-      else:
-        c = (
-            sigmoid(f + self._forget_bias) * c_prev +
-            sigmoid(i) * self._activation(j))
+            if self._use_peepholes:
+                c = (
+                    sigmoid(f + self._forget_bias + w_f_diag * c_prev) * c_prev
+                    + sigmoid(i + w_i_diag * c_prev) * self._activation(j)
+                )
+            else:
+                c = (
+                    sigmoid(f + self._forget_bias) * c_prev +
+                    sigmoid(i) * self._activation(j)
+                )
 
-      if self._layer_norm:
-        c = _norm(self._norm_gain, self._norm_shift, c, "state")
+            if self._layer_norm:
+                c = _norm(self._norm_gain, self._norm_shift, c, "state")
 
-      if self._cell_clip is not None:
-        # pylint: disable=invalid-unary-operand-type
-        c = tf.clip_by_value(c, -self._cell_clip, self._cell_clip)
-        # pylint: enable=invalid-unary-operand-type
-      if self._use_peepholes:
-        m = sigmoid(o + w_o_diag * c) * self._activation(c)
-      else:
-        m = sigmoid(o) * self._activation(c)
+            if self._cell_clip is not None:
+                # pylint: disable=invalid-unary-operand-type
+                c = tf.clip_by_value(c, -self._cell_clip, self._cell_clip)
+                # pylint: enable=invalid-unary-operand-type
+            if self._use_peepholes:
+                m = sigmoid(o + w_o_diag * c) * self._activation(c)
+            else:
+                m = sigmoid(o) * self._activation(c)
 
-      if self._num_proj is not None:
-        with tf.variable_scope("projection"):
-          m = self._linear(m, self._num_proj, bias=False)
+            if self._num_proj is not None:
+                with tf.variable_scope("projection"):
+                    m = self._linear(m, self._num_proj, bias=False)
 
-        if self._proj_clip is not None:
-          # pylint: disable=invalid-unary-operand-type
-          m = tf.clip_by_value(m, -self._proj_clip, self._proj_clip)
-          # pylint: enable=invalid-unary-operand-type
+                if self._proj_clip is not None:
+                    # pylint: disable=invalid-unary-operand-type
+                    m = tf.clip_by_value(m, -self._proj_clip, self._proj_clip)
+                    # pylint: enable=invalid-unary-operand-type
 
-    new_state = (tf.nn.rnn_cell.LSTMStateTuple(c, m))
-    return m, new_state
+        new_state = (tf.nn.rnn_cell.LSTMStateTuple(c, m))
+        return m, new_state
+
+
 # Correct Layer Norm LSTM end
+
 
 def model_fn(features, labels, mode, params, config):
     # labels shape=(batch_size, sequence_length), dtype=int32
@@ -3240,17 +3547,13 @@ def model_fn(features, labels, mode, params, config):
             dtype=float_type,  # default: tf.float32
             # initializer=None, # default: tf.glorot_uniform_initializer(seed=None, dtype=tf.float32)
             initializer=tf.random_uniform_initializer(
-                minval=-0.5,
-                maxval=0.5,
-                dtype=float_type
+                minval=-0.5, maxval=0.5, dtype=float_type
             ),
             trainable=True,
         )  # vocab_size * embed_dim = 28 * 32 = 896
         # tf.Variable 'embedding_matrix:0' shape=(vocab_size, embed_dim) dtype=float32
         embedded = tf.nn.embedding_lookup(
-            params=embeddings,
-            ids=protein,
-            name='embedding_lookup'
+            params=embeddings, ids=protein, name='embedding_lookup'
         )
         # tf.Tensor: shape=(batch_size, sequence_length, embed_dim), dtype=float32
         dropped_embedded = tf.layers.dropout(
@@ -3266,7 +3569,7 @@ def model_fn(features, labels, mode, params, config):
     # temporal convolution
     with tf.variable_scope('conv_1'):
         if params.use_conv_1_prenet:
-            conv_1_prenet_sizes=[params.embed_dim, params.embed_dim // 2]
+            conv_1_prenet_sizes = [params.embed_dim, params.embed_dim // 2]
             for d, units in enumerate(conv_1_prenet_sizes):
                 with tf.variable_scope('prenet_{}'.format(d)):
                     dense = tf.layers.dense(
@@ -3316,7 +3619,7 @@ def model_fn(features, labels, mode, params, config):
                             name='conv1d_{}'.format(k),
                             reuse=None
                         )  # (kernel_size * embed_dim + use_bias) * filters = (7 * 32 + 1) * 32 = 7200
-                        # weights = [(kernel_size, embed_dim, filters), (filters)]
+                    # weights = [(kernel_size, embed_dim, filters), (filters)]
                 else:
                     conv_fn = lambda k: \
                         tf.layers.conv1d(
@@ -3337,10 +3640,11 @@ def model_fn(features, labels, mode, params, config):
                             name='conv1d_{}'.format(k),
                             reuse=None
                         )  # (kernel_size * embed_dim + use_bias) * filters = (7 * 32 + 1) * 32 = 7200
-                        # weights = [(kernel_size, embed_dim, filters), (filters)]
+                    # weights = [(kernel_size, embed_dim, filters), (filters)]
                 # params.conv_1_bank_size = 15
                 convolved = tf.concat(
-                    [conv_fn(k) for k in range(1, params.conv_1_bank_size + 1)], axis=-1
+                    [conv_fn(k) for k in range(1, params.conv_1_bank_size + 1)],
+                    axis=-1
                 )
                 # convolved.shape[2] = 32 * 15 = 480
                 # tf.Tensor: shape=(batch_size, sequence_length, conv_1_filters * conv_1_bank_size), dtype=float32
@@ -3362,7 +3666,8 @@ def model_fn(features, labels, mode, params, config):
                 use_bias=False,
                 # kernel_initializer=None, # default: tf.glorot_uniform_initializer(seed=None, dtype=tf.float32)
                 kernel_initializer=tf.glorot_uniform_initializer(
-                    seed=None, dtype=float_type),
+                    seed=None, dtype=float_type
+                ),
                 bias_initializer=tf.zeros_initializer(dtype=float_type),
                 trainable=True,
                 name='conv1d',
@@ -3421,10 +3726,7 @@ def model_fn(features, labels, mode, params, config):
                 renorm_decay=0.99,
                 adjustment=None
             )
-        convolved = tf.nn.relu(
-            convolved,
-            name='relu'
-        )
+        convolved = tf.nn.relu(convolved, name='relu')
         convolved = tf.layers.dropout(
             inputs=convolved,
             rate=params.conv_1_dropout,  # 0.2
@@ -3434,16 +3736,18 @@ def model_fn(features, labels, mode, params, config):
         )
 
         # Residual connection
-        if params.use_conv_1_residual: # True
+        if params.use_conv_1_residual:  # True
             convolved = tf.concat(values=[convolved, dropped_embedded], axis=-1)
             # convolved.shape[2] = 480 + 32 = 512
 
         # Highway network
-        if params.use_conv_1_highway: # True
+        if params.use_conv_1_highway:  # True
             # Handle dimensionality mismatch:
-            if convolved.shape[2] != params.conv_1_highway_units: # 32
-                convolved = tf.layers.dense(convolved, params.conv_1_highway_units)
-            for d in range(params.conv_1_highway_depth): # 3
+            if convolved.shape[2] != params.conv_1_highway_units:  # 32
+                convolved = tf.layers.dense(
+                    convolved, params.conv_1_highway_units
+                )
+            for d in range(params.conv_1_highway_depth):  # 3
                 with tf.variable_scope('highway_{}'.format(d)):
                     H = tf.layers.dense(
                         inputs=convolved,
@@ -3484,7 +3788,7 @@ def model_fn(features, labels, mode, params, config):
                     #     ) # [128 512 16][128 512 32][128 512 32]
                     convolved = H * T + convolved * (1.0 - T)
         # Self attention layer
-        if params.use_conv_1_attention: # False
+        if params.use_conv_1_attention:  # False
             # convolved = dot_attention(
             #     inputs=convolved,
             #     memory=convolved,
@@ -3500,20 +3804,24 @@ def model_fn(features, labels, mode, params, config):
                 query_antecedent=convolved,
                 memory_antecedent=None,
                 bias=attention_bias_ignore_padding(padding),
-                total_key_depth=params.attention_key_channels or params.attention_hidden_size, # 32
-                total_value_depth=params.attention_value_channels or params.attention_hidden_size, # 32
-                output_depth=params.attention_hidden_size, # 32
-                num_heads=params.attention_num_heads, # 1
-                dropout_rate=params.attention_dropout, # 0.0
-                attention_type=params.attention_type, # local_unmasked or dot_product
-                block_length=params.attention_block_length, # 128
-                filter_width=params.attention_filter_width, # 64
+                total_key_depth=params.attention_key_channels or
+                params.attention_hidden_size,  # 32
+                total_value_depth=params.attention_value_channels or
+                params.attention_hidden_size,  # 32
+                output_depth=params.attention_hidden_size,  # 32
+                num_heads=params.attention_num_heads,  # 1
+                dropout_rate=params.attention_dropout,  # 0.0
+                attention_type=params.
+                attention_type,  # local_unmasked or dot_product
+                block_length=params.attention_block_length,  # 128
+                filter_width=params.attention_filter_width,  # 64
                 save_weights_to=None,
                 make_image_summary=False,
                 dropout_broadcast_dims=None,
                 max_length=None,
-                vars_3d=False)
-            if params.use_conv_1_attention_batch_norm: # False
+                vars_3d=False
+            )
+            if params.use_conv_1_attention_batch_norm:  # False
                 convolved = tf.contrib.layers.batch_norm(
                     inputs=convolved,
                     decay=0.99,
@@ -3546,41 +3854,57 @@ def model_fn(features, labels, mode, params, config):
         rnn_float_type = float_type
         rnn_cell_type = params.rnn_cell_type.lower()
         rnn_cells = {
-            'lstmcell': tf.nn.rnn_cell.LSTMCell,
-            'grucell': tf.nn.rnn_cell.GRUCell,
-            'grublockcellv2': tf.contrib.rnn.GRUBlockCellV2,
-            'srucell': tf.contrib.rnn.SRUCell,
-            'layernormlstmcell': functools.partial(tf.contrib.rnn.LayerNormBasicLSTMCell,
-                layer_norm=True
-            ),
-            'layernormlstmcellv2': functools.partial(LayerNormLSTMCellv2,
-                layer_norm=True,
-                layer_norm_columns=False,
-                use_peepholes=params.use_rnn_peepholes
-            ),
-            'lstmblockfusedcell': lstm_ops.LSTMBlockFusedCell,
-            'cudnnlstm': tf.contrib.cudnn_rnn.CudnnLSTM,
-            'cudnngru': tf.contrib.cudnn_rnn.CudnnGRU,
-            'qrnn': 'qrnn'
+            'lstmcell':
+                tf.nn.rnn_cell.LSTMCell,
+            'grucell':
+                tf.nn.rnn_cell.GRUCell,
+            'grublockcellv2':
+                tf.contrib.rnn.GRUBlockCellV2,
+            'srucell':
+                tf.contrib.rnn.SRUCell,
+            'layernormlstmcell':
+                functools.partial(
+                    tf.contrib.rnn.LayerNormBasicLSTMCell, layer_norm=True
+                ),
+            'layernormlstmcellv2':
+                functools.partial(
+                    LayerNormLSTMCellv2,
+                    layer_norm=True,
+                    layer_norm_columns=False,
+                    use_peepholes=params.use_rnn_peepholes
+                ),
+            'lstmblockfusedcell':
+                lstm_ops.LSTMBlockFusedCell,
+            'cudnnlstm':
+                tf.contrib.cudnn_rnn.CudnnLSTM,
+            'cudnngru':
+                tf.contrib.cudnn_rnn.CudnnGRU,
+            'qrnn':
+                'qrnn'
         }
         cell = rnn_cells[rnn_cell_type]
         if rnn_cell_type.startswith('cudnn'):
             transposed_convolved = tf.transpose(
-                convolved, [1, 0, 2], name='transpose_to_rnn')
+                convolved, [1, 0, 2], name='transpose_to_rnn'
+            )
             lstm = cell(
                 num_layers=len(params.rnn_num_units),
                 num_units=params.rnn_num_units[0],
-                input_mode='linear_input', # can be 'linear_input', 'skip_input' or 'auto_select'
-                direction="bidirectional", # Can be either 'unidirectional' or 'bidirectional'
+                input_mode=
+                'linear_input',  # can be 'linear_input', 'skip_input' or 'auto_select'
+                direction=
+                "bidirectional",  # Can be either 'unidirectional' or 'bidirectional'
                 dropout=params.rnn_dropout,
                 seed=0,
                 dtype=rnn_float_type,
                 kernel_initializer=None,
-                bias_initializer=None, # default is all zeros
+                bias_initializer=None,  # default is all zeros
                 name='CudnnGRU1'
             )
             # call(self, inputs, initial_state=None, training=True)
-            outputs, output_h = lstm(tf.cast(transposed_convolved, rnn_float_type))
+            outputs, output_h = lstm(
+                tf.cast(transposed_convolved, rnn_float_type)
+            )
             # Returns:
             # output: a tensor of shape `[time_len, batch_size, num_dirs * num_units]`
             #     if `time_major` is True (default) or `[batch_size, time_len,
@@ -3588,11 +3912,32 @@ def model_fn(features, labels, mode, params, config):
             #     It is a `concat([fwd_output, bak_output], axis=2)`.
             # output_states: a tuple of tensor(s) of the same shape and structure as
             #     `initial_state`.
-            outputs = tf.concat(
-                values=[outputs[0], outputs[-1]],
-                axis=1,
-                name='concat'
-            )
+            if params.rnn_output_type == 'seq_length':
+                outputs = tf.reshape(
+                    tf.concat(
+                        [
+                            tf.squeeze(
+                                tf.gather(
+                                    tf.transpose(outputs, [1, 0, 2]),
+                                    tf.expand_dims(input=lengths - 1, axis=1),
+                                    batch_dims=1
+                                ),
+                                axis=[1]
+                            )[:, :params.rnn_num_units[0]],  # last fwd_output
+                            outputs[0, :, params.rnn_num_units[0]:
+                                   ]  # last bak_output
+                        ],
+                        axis=1
+                    ),
+                    [-1, params.rnn_num_units[0] * 2]
+                )
+                # outputs: shape=(batch_size, 2*num_units), dtype=float32
+            else:
+                # outputs[0]: shape=(batch_size, 2*num_units), dtype=float32
+                outputs = tf.concat(
+                    values=[outputs[0], outputs[-1]], axis=1, name='concat'
+                )
+                # outputs: shape=(batch_size, 4*num_units), dtype=float32
             # Convert back from time-major outputs to batch-major outputs.
             # outputs = tf.transpose(
             #     outputs, [1, 0, 2], name='transpose_from_rnn')
@@ -3604,7 +3949,8 @@ def model_fn(features, labels, mode, params, config):
             #     ) # [64 1016 256][64 1016 32]
         elif rnn_cell_type == 'lstmblockfusedcell':
             transposed_convolved = tf.transpose(
-                convolved, [1, 0, 2], name='transpose_to_rnn')
+                convolved, [1, 0, 2], name='transpose_to_rnn'
+            )
             lstm_fw = cell(
                 num_units=params.rnn_num_units[0],
                 forget_bias=1.0,
@@ -3641,13 +3987,12 @@ def model_fn(features, labels, mode, params, config):
                 sequence_length=lengths
             )
             outputs = tf.concat(
-                values=[output_fw, output_bw],
-                axis=2,
-                name='concat'
+                values=[output_fw, output_bw], axis=2, name='concat'
             )
             # Convert back from time-major outputs to batch-major outputs.
             outputs = tf.transpose(
-                outputs, [1, 0, 2], name='transpose_from_rnn')
+                outputs, [1, 0, 2], name='transpose_from_rnn'
+            )
         elif rnn_cell_type == 'qrnn':
             import qrnn
             output_fw, output_fw_states = qrnn.qrnn(
@@ -3683,9 +4028,7 @@ def model_fn(features, labels, mode, params, config):
             )
             # output_fw shape [batch, length, rnn_num_units]
             outputs = tf.concat(
-                values=[output_fw, output_bw],
-                axis=2,
-                name='concat'
+                values=[output_fw, output_bw], axis=2, name='concat'
             )
         else:
             # cell = tf.nn.rnn_cell.LSTMCell
@@ -3721,11 +4064,12 @@ def model_fn(features, labels, mode, params, config):
             # )
             # outputs shape=(batch_size, sequence_length, params.rnn_num_units * 2), dtype=float32
             outputs, output_states = tf.nn.bidirectional_dynamic_rnn(
-                cell_fw=cell(params.rnn_num_units[0]), # 32
+                cell_fw=cell(params.rnn_num_units[0]),  # 32
                 cell_bw=cell(params.rnn_num_units[0]),
                 inputs=convolved,
                 dtype=rnn_float_type,
-                sequence_length=lengths, # An int32/int64 vector, size `[batch_size]`,
+                sequence_length=
+                lengths,  # An int32/int64 vector, size `[batch_size]`,
                 # containing the actual lengths for each of the sequences.
                 ## the network is fully unrolled for the given (passed in)
                 # length(s) of the sequence(s) or completely unrolled if length(s) is not
@@ -3735,7 +4079,8 @@ def model_fn(features, labels, mode, params, config):
                 # sequence length of the minibatch (thus saving computational time),
                 # and properly propagates the state at an example's sequence length
                 # to the final state output.
-                parallel_iterations=None, # default: 32. The number of iterations to run in
+                parallel_iterations=
+                None,  # default: 32. The number of iterations to run in
                 # parallel.  Those operations which do not have any temporal dependency
                 # and can be run in parallel, will be.  This parameter trades off
                 # time for space.  Values >> 1 use more memory but take less time,
@@ -3743,18 +4088,14 @@ def model_fn(features, labels, mode, params, config):
                 time_major=False,
                 scope='bi_rnn_1'
             )
-            outputs = tf.concat(
-                values=outputs,
-                axis=2,
-                name='concat'
-            )
+            outputs = tf.concat(values=outputs, axis=2, name='concat')
             # outputs = tf.Print(outputs,
             #     data=[outputs, dropped_convolved,
             #         tf.shape(outputs), tf.shape(dropped_convolved)],
             #     message='## DEBUG RNN: ',
             #     summarize=500
             #     ) # [64 1016 128][64 1016 32]
-        if params.use_rnn_batch_norm: # True
+        if params.use_rnn_batch_norm:  # True
             # outputs = tf.layers.batch_normalization(
             #     outputs,
             #     axis=-1,
@@ -3801,14 +4142,14 @@ def model_fn(features, labels, mode, params, config):
                 data_format='NHWC',
                 zero_debias_moving_mean=False,
                 scope=None,
-                renorm=params.use_batch_renorm, # False
+                renorm=params.use_batch_renorm,  # False
                 renorm_clipping=None,
                 renorm_decay=0.99,
                 adjustment=None
             )
 
     with tf.variable_scope('rnn_attention_1'):
-        if params.use_rnn_attention: # False
+        if params.use_rnn_attention:  # False
             # outputs = dot_attention(
             #     inputs=outputs,
             #     memory=outputs,
@@ -3824,19 +4165,23 @@ def model_fn(features, labels, mode, params, config):
                 query_antecedent=outputs,
                 memory_antecedent=None,
                 bias=attention_bias_ignore_padding(padding),
-                total_key_depth=params.attention_key_channels or params.attention_hidden_size, # 32
-                total_value_depth=params.attention_value_channels or params.attention_hidden_size, # 32
-                output_depth=params.rnn_attention_hidden_size, # 128
-                num_heads=params.attention_num_heads, # 1
-                dropout_rate=params.attention_dropout, # 0.0
-                attention_type=params.attention_type, # local_unmasked or dot_product
-                block_length=params.attention_block_length, # 128
-                filter_width=params.attention_filter_width, # 64
+                total_key_depth=params.attention_key_channels or
+                params.attention_hidden_size,  # 32
+                total_value_depth=params.attention_value_channels or
+                params.attention_hidden_size,  # 32
+                output_depth=params.rnn_attention_hidden_size,  # 128
+                num_heads=params.attention_num_heads,  # 1
+                dropout_rate=params.attention_dropout,  # 0.0
+                attention_type=params.
+                attention_type,  # local_unmasked or dot_product
+                block_length=params.attention_block_length,  # 128
+                filter_width=params.attention_filter_width,  # 64
                 save_weights_to=None,
                 make_image_summary=False,
                 dropout_broadcast_dims=None,
                 max_length=None,
-                vars_3d=False)
+                vars_3d=False
+            )
             if params.use_rnn_attention_batch_norm:
                 outputs = tf.contrib.layers.batch_norm(
                     inputs=outputs,
@@ -3864,13 +4209,36 @@ def model_fn(features, labels, mode, params, config):
                     adjustment=None
                 )
 
-
+    # Residual network
+    if params.use_output_residual:  # True
+        for i, residual_units in enumerate(params.output_residual_units):  # 3
+            with tf.variable_scope('residual_{}_{}'.format(i, residual_units)):
+                new_outputs = tf.layers.dense(
+                    inputs=outputs,
+                    units=residual_units,
+                    activation=tf.nn.relu,
+                    use_bias=True,
+                    kernel_initializer=tf.glorot_uniform_initializer(
+                        seed=None, dtype=float_type
+                    ),
+                    bias_initializer=tf.zeros_initializer(),
+                    kernel_regularizer=None,
+                    bias_regularizer=None,
+                    activity_regularizer=None,
+                    kernel_constraint=None,
+                    bias_constraint=None,
+                    trainable=True,
+                    name='dense',
+                    reuse=None
+                )
+                outputs = tf.concat(values=[new_outputs, outputs], axis=-1)
+        # convolved.shape[2] = 480 + 32 = 512
     # Highway network
-    if params.use_output_highway: # True
+    elif params.use_output_highway:  # True
         # Handle dimensionality mismatch:
-        if outputs.shape[1] != params.output_highway_units: # 32
+        if outputs.shape[1] != params.output_highway_units:  # 32
             outputs = tf.layers.dense(outputs, params.output_highway_units)
-        for d in range(params.output_highway_depth): # 3
+        for d in range(params.output_highway_depth):  # 3
             with tf.variable_scope('highway_{}'.format(d)):
                 H = tf.layers.dense(
                     inputs=outputs,
@@ -3918,7 +4286,8 @@ def model_fn(features, labels, mode, params, config):
             activation=None,
             use_bias=True,
             kernel_initializer=tf.glorot_uniform_initializer(
-                seed=None, dtype=float_type),
+                seed=None, dtype=float_type
+            ),
             bias_initializer=tf.zeros_initializer(dtype=float_type),
             kernel_regularizer=None,
             bias_regularizer=None,
@@ -3954,7 +4323,8 @@ def model_fn(features, labels, mode, params, config):
                     # transition_params shape=(num_classes, num_classes), dtype=float32
             else:
                 losses = tf.nn.weighted_cross_entropy_with_logits(
-                    labels=labels * params.scale_label + (1-params.scale_label)/2.0,
+                    labels=labels * params.scale_label +
+                    (1 - params.scale_label) / 2.0,
                     logits=tf.cast(logits, tf.float32),
                     pos_weight=params.loss_pos_weight
                 )
@@ -4050,24 +4420,35 @@ def model_fn(features, labels, mode, params, config):
             #     name='recall'
             # ),
             # matches / total
-            'accuracy': tf.metrics.accuracy(
-                labels=labels,
-                predictions=predicted_labels,
-                name='accuracy'
-            )
+            'accuracy':
+                tf.metrics.accuracy(
+                    labels=labels,
+                    predictions=predicted_labels,
+                    name='accuracy'
+                )
         }
 
         with tf.name_scope('batch_accuracy', values=[predicted_labels, labels]):
             is_correct = tf.cast(tf.equal(predicted_labels, labels), tf.float32)
             total_values = tf.cast(batch_size * params.num_classes, tf.float32)
-            batch_accuracy = tf.math.divide(tf.reduce_sum(
-                is_correct), total_values)
-            TP = tf.cast(tf.count_nonzero(predicted_labels * labels), tf.float32)
-            FP = tf.cast(tf.count_nonzero(predicted_labels * (labels - 1)), tf.float32)
-            FN = tf.cast(tf.count_nonzero((predicted_labels - 1) * labels), tf.float32)
+            batch_accuracy = tf.math.divide(
+                tf.reduce_sum(is_correct), total_values
+            )
+            TP = tf.cast(
+                tf.count_nonzero(predicted_labels * labels), tf.float32
+            )
+            FP = tf.cast(
+                tf.count_nonzero(predicted_labels * (labels - 1)), tf.float32
+            )
+            FN = tf.cast(
+                tf.count_nonzero((predicted_labels - 1) * labels), tf.float32
+            )
             batch_precision = tf.math.divide_no_nan(TP, (TP + FP))
             batch_recall = tf.math.divide_no_nan(TP, (TP + FN))
-            batch_f1 = tf.math.divide_no_nan(2 * batch_precision * batch_recall, (batch_precision + batch_recall))
+            batch_f1 = tf.math.divide_no_nan(
+                2 * batch_precision * batch_recall,
+                (batch_precision + batch_recall)
+            )
         tf.summary.scalar('accuracy', batch_accuracy)
         tf.summary.scalar('precision', batch_precision)
         tf.summary.scalar('recall', batch_recall)
@@ -4079,13 +4460,21 @@ def model_fn(features, labels, mode, params, config):
 
     # optimizer list
     optimizers = {
-        'adagrad': tf.train.AdagradOptimizer,
-        'adam': lambda lr: tf.train.AdamOptimizer(lr, epsilon=params.adam_epsilon),
-        'nadam': lambda lr: tf.contrib.opt.NadamOptimizer(lr, epsilon=params.adam_epsilon),
-        'ftrl': tf.train.FtrlOptimizer,
-        'momentum': lambda lr: tf.train.MomentumOptimizer(lr, momentum=0.9),
-        'rmsprop': tf.train.RMSPropOptimizer,
-        'sgd': tf.train.GradientDescentOptimizer,
+        'adagrad':
+            tf.train.AdagradOptimizer,
+        'adam':
+            lambda lr: tf.train.AdamOptimizer(lr, epsilon=params.adam_epsilon),
+        'nadam':
+            lambda lr: tf.contrib.opt.
+            NadamOptimizer(lr, epsilon=params.adam_epsilon),
+        'ftrl':
+            tf.train.FtrlOptimizer,
+        'momentum':
+            lambda lr: tf.train.MomentumOptimizer(lr, momentum=0.9),
+        'rmsprop':
+            tf.train.RMSPropOptimizer,
+        'sgd':
+            tf.train.GradientDescentOptimizer,
     }
 
     # optimizer
@@ -4101,8 +4490,13 @@ def model_fn(features, labels, mode, params, config):
             name=None
         )
 
-
-        def learning_rate_warmup(global_step, warmup_steps, repeat_steps=0, start=0.01, warmup_schedule='exp'):
+        def learning_rate_warmup(
+            global_step,
+            warmup_steps,
+            repeat_steps=0,
+            start=0.01,
+            warmup_schedule='exp'
+        ):
             """Learning rate warmup multiplier."""
             local_step = global_step
             if repeat_steps > 0:
@@ -4110,22 +4504,27 @@ def model_fn(features, labels, mode, params, config):
             if not warmup_steps:
                 return tf.constant(1.)
 
-            tf.logging.info('Applying %s learning rate warmup for %d steps',
-                            warmup_schedule, warmup_steps)
+            tf.logging.info(
+                'Applying %s learning rate warmup for %d steps',
+                warmup_schedule, warmup_steps
+            )
 
             local_step = tf.cast(local_step, dtype=tf.float32)
             warmup_steps = tf.cast(warmup_steps, dtype=tf.float32)
             start = tf.cast(start, dtype=tf.float32)
             warmup = tf.constant(1.)
             if warmup_schedule == 'exp':
-                warmup = tf.exp(tf.log(start) / warmup_steps)**(warmup_steps - local_step)
+                warmup = tf.exp(tf.log(start) / warmup_steps
+                               )**(warmup_steps - local_step)
             else:
                 assert warmup_schedule == 'linear'
-                warmup = ((tf.constant(1.) - start) / warmup_steps) * local_step + start
+                warmup = (
+                    (tf.constant(1.) - start) / warmup_steps
+                ) * local_step + start
             return tf.where(local_step < warmup_steps, warmup, tf.constant(1.))
 
         decay = params.learning_rate_decay_fn.lower()
-        lr = params.learning_rate # if not decay or decay == 'none':
+        lr = params.learning_rate  # if not decay or decay == 'none':
         if decay == 'noisy_linear_cosine_decay':
             lr = tf.train.noisy_linear_cosine_decay(
                 params.learning_rate,
@@ -4142,18 +4541,18 @@ def model_fn(features, labels, mode, params, config):
             lr = tf.train.exponential_decay(
                 params.learning_rate,
                 global_step,
-                decay_steps=params.learning_rate_decay_steps, # 27000000
-                decay_rate=params.learning_rate_decay_rate, # 0.95
+                decay_steps=params.learning_rate_decay_steps,  # 27000000
+                decay_rate=params.learning_rate_decay_rate,  # 0.95
                 staircase=False,
                 name=None
             )
         if params.warmup_steps > 0:
             warmup = learning_rate_warmup(
                 global_step,
-                warmup_steps=params.warmup_steps, # 35000
-                repeat_steps=params.warmup_repeat_steps, # 0
-                start=params.warmup_start_lr, # 0.001,
-                warmup_schedule=params.warmup_schedule, # 'exp'
+                warmup_steps=params.warmup_steps,  # 35000
+                repeat_steps=params.warmup_repeat_steps,  # 0
+                start=params.warmup_start_lr,  # 0.001,
+                warmup_schedule=params.warmup_schedule,  # 'exp'
             )
             lr = lr * warmup
         # Add learning rate to summary
@@ -4204,8 +4603,13 @@ def model_fn(features, labels, mode, params, config):
         aggregation=tf.VariableAggregation.SUM
     )
     # print('examples_processed', examples_processed)
-    group_inputs.append(tf.assign_add(examples_processed,
-                                      tf.cast(batch_size, tf.int64), name='update_examples_processed'))
+    group_inputs.append(
+        tf.assign_add(
+            examples_processed,
+            tf.cast(batch_size, tf.int64),
+            name='update_examples_processed'
+        )
+    )
     epoch = examples_processed // seq_total
     group_inputs.append(epoch)
     progress = examples_processed / seq_total - tf.cast(epoch, tf.float64)
@@ -4220,24 +4624,30 @@ def model_fn(features, labels, mode, params, config):
                 tf.equal(global_step, 193000)
             ),
             false_fn=lambda: train_op,
-            true_fn=lambda: tf.Print(train_op,
-                                     # data=[global_step, metrics['accuracy'][0], lengths, loss, losses, predictions['classes'], labels, mask, protein, embeddings],
-                                     data=[global_step, batch_accuracy,
-                                           lengths, loss, embeddings],
-                                     message='## DEBUG LOSS: ',
-                                     summarize=50000
-                                     )
+            true_fn=lambda: tf.Print(
+                train_op,
+                # data=[global_step, metrics['accuracy'][0], lengths, loss, losses, predictions['classes'], labels, mask, protein, embeddings],
+                data=[global_step, batch_accuracy, lengths, loss, embeddings],
+                message='## DEBUG LOSS: ',
+                summarize=50000
+            )
         )
 
     training_hooks = []
     # INFO:tensorflow:global_step/sec: 2.07549
-    training_hooks.append(tf.train.StepCounterHook(
-        output_dir=params.model_dir,
-        every_n_steps=params.log_step_count_steps
-    ))
+    training_hooks.append(
+        tf.train.StepCounterHook(
+            output_dir=params.model_dir,
+            every_n_steps=params.log_step_count_steps
+        )
+    )
+
     # INFO:tensorflow:accuracy = 0.16705106, examples = 15000, loss = 9.688441, step = 150 (24.091 sec)
     def logging_formatter(v):
-        return 'TP:\033[1;32m {:5.0f}\033[0m, precision:\033[1;32m {:9.5%}\033[0m, recall:\033[1;32m {:9.5%}\033[0m, f1:\033[1;32m {:9.5%}\033[0m, accuracy:\033[1;32m {:9.5%}\033[0m, loss:\033[1;32m {:8.5f}\033[0m, lr:\033[1;32m {:8.5f}\033[0m, step:\033[1;32m {:7,d}\033[0m'.format(v['TP'], v['precision'], v['recall'], v['f1'], v['accuracy'], v['loss'], v['learning_rate'], v['step'])
+        return 'TP:\033[1;32m {:5.0f}\033[0m, precision:\033[1;32m {:9.5%}\033[0m, recall:\033[1;32m {:9.5%}\033[0m, f1:\033[1;32m {:9.5%}\033[0m, accuracy:\033[1;32m {:9.5%}\033[0m, loss:\033[1;32m {:8.5f}\033[0m, lr:\033[1;32m {:8.5f}\033[0m, step:\033[1;32m {:7,d}\033[0m'.format(
+            v['TP'], v['precision'], v['recall'], v['f1'], v['accuracy'],
+            v['loss'], v['learning_rate'], v['step']
+        )
 
     tensors = {
         'TP': TP,
@@ -4255,31 +4665,40 @@ def model_fn(features, labels, mode, params, config):
     #     tensors['epoch'] = epoch
     #     tensors['progress'] = progress
 
-    training_hooks.append(ColoredLoggingTensorHook(
-        tensors=tensors,
-        every_n_iter=params.log_step_count_steps,
-        at_end=False, formatter=logging_formatter
-    ))
-    training_hooks.append(EpochProgressBarHook(
-        total=seq_total,
-        initial_tensor=examples_processed,
-        n_tensor=batch_size,
-        postfix_tensors=None,
-        every_n_iter=params.log_step_count_steps
-    ))
+    training_hooks.append(
+        ColoredLoggingTensorHook(
+            tensors=tensors,
+            every_n_iter=params.log_step_count_steps,
+            at_end=False,
+            formatter=logging_formatter
+        )
+    )
+    training_hooks.append(
+        EpochProgressBarHook(
+            total=seq_total,
+            initial_tensor=examples_processed,
+            n_tensor=batch_size,
+            postfix_tensors=None,
+            every_n_iter=params.log_step_count_steps
+        )
+    )
     if params.trace:
-        training_hooks.append(tf.train.ProfilerHook(
-            save_steps=params.save_summary_steps,
-            output_dir=params.model_dir,
-            show_dataflow=True,
-            show_memory=True
-        ))
-    training_hooks.append(EpochCheckpointInputPipelineHook(
-        checkpoint_dir=params.model_dir,
-        config=config,
-        save_secs=params.save_checkpoints_secs, # 10m
-        save_steps=None,
-    ))
+        training_hooks.append(
+            tf.train.ProfilerHook(
+                save_steps=params.save_summary_steps,
+                output_dir=params.model_dir,
+                show_dataflow=True,
+                show_memory=True
+            )
+        )
+    training_hooks.append(
+        EpochCheckpointInputPipelineHook(
+            checkpoint_dir=params.model_dir,
+            config=config,
+            save_secs=params.save_checkpoints_secs,  # 10m
+            save_steps=None,
+        )
+    )
 
     # default saver is added in estimator._train_with_estimator_spec
     # training.Saver(
@@ -4289,13 +4708,17 @@ def model_fn(features, labels, mode, params, config):
     #       self._config.keep_checkpoint_every_n_hours),
     #   defer_build=True,
     #   save_relative_paths=True)
-    scaffold = tf.train.Scaffold(saver=tf.train.Saver(
-        sharded=False,
-        max_to_keep=config.keep_checkpoint_max,
-        keep_checkpoint_every_n_hours=(
-            config.keep_checkpoint_every_n_hours),
-        defer_build=True,
-        save_relative_paths=True))
+    scaffold = tf.train.Scaffold(
+        saver=tf.train.Saver(
+            sharded=False,
+            max_to_keep=config.keep_checkpoint_max,
+            keep_checkpoint_every_n_hours=(
+                config.keep_checkpoint_every_n_hours
+            ),
+            defer_build=True,
+            save_relative_paths=True
+        )
+    )
 
     training_chief_hooks = []
     # # saving_listeners like _NewCheckpointListenerForEvaluate
@@ -4321,13 +4744,15 @@ def model_fn(features, labels, mode, params, config):
     #     checkpoint_basename="model.step",
     #     scaffold=scaffold
     # ))
-    training_chief_hooks.append(EpochCheckpointSaverHook(
-        checkpoint_dir=params.model_dir,
-        epoch_tensor=epoch,
-        save_secs=params.save_checkpoints_secs, # 10m
-        save_steps=None,
-        scaffold=scaffold
-    ))
+    training_chief_hooks.append(
+        EpochCheckpointSaverHook(
+            checkpoint_dir=params.model_dir,
+            epoch_tensor=epoch,
+            save_secs=params.save_checkpoints_secs,  # 10m
+            save_steps=None,
+            scaffold=scaffold
+        )
+    )
 
     # local training:
     # all_hooks=[
@@ -4354,19 +4779,23 @@ def model_fn(features, labels, mode, params, config):
     # elif params.eval_level == 'min':
     #     eval_tensors['classes'] = classes
 
-    evaluation_hooks.append(SaveEvaluationResultHook(
-        tensors=eval_tensors,
-        model_dir=params.model_dir,
-        output_dir=params.eval_dir,
-        output_prefix=params.eval_prefix,
-        output_format=params.eval_format
-    ))
-    evaluation_hooks.append(EvalProgressBarHook(
-        # total=10848467,
-        # total=16711,
-        total=seq_total,
-        n_tensor=batch_size
-    ))
+    evaluation_hooks.append(
+        SaveEvaluationResultHook(
+            tensors=eval_tensors,
+            model_dir=params.model_dir,
+            output_dir=params.eval_dir,
+            output_prefix=params.eval_prefix,
+            output_format=params.eval_format
+        )
+    )
+    evaluation_hooks.append(
+        EvalProgressBarHook(
+            # total=10848467,
+            # total=16711,
+            total=seq_total,
+            n_tensor=batch_size
+        )
+    )
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
@@ -4383,6 +4812,7 @@ def model_fn(features, labels, mode, params, config):
         evaluation_hooks=evaluation_hooks,
         prediction_hooks=None
     )
+
 
 # https://github.com/tensorflow/models/blob/69cf6fca2106c41946a3c395126bdd6994d36e6b/tutorials/rnn/quickdraw/train_model.py
 
@@ -4430,11 +4860,9 @@ def create_estimator_and_specs(run_config):
         repeat_count=FLAGS.repeat_count,  # -1 = Repeat the input indefinitely.
         batch_size=FLAGS.batch_size,
         prefetch_buffer=FLAGS.prefetch_buffer,  # batches
-
         vocab_size=FLAGS.vocab_size,  # 28
         embed_dim=FLAGS.embed_dim,  # 32
         embedded_dropout=FLAGS.embedded_dropout,  # 0.2
-
         use_conv_1_prenet=FLAGS.use_conv_1_prenet,  # 32
         conv_1_prenet_dropout=FLAGS.conv_1_prenet_dropout,  # 32
         use_conv_1_bank=FLAGS.use_conv_1_bank,  # True
@@ -4459,31 +4887,29 @@ def create_estimator_and_specs(run_config):
         attention_block_length=FLAGS.attention_block_length,
         attention_filter_width=FLAGS.attention_filter_width,
         use_conv_1_attention_batch_norm=FLAGS.use_conv_1_attention_batch_norm,
-
         rnn_cell_type=FLAGS.rnn_cell_type,
-        rnn_num_units=FLAGS.rnn_num_units, # list
+        rnn_num_units=FLAGS.rnn_num_units,  # list
         rnn_dropout=FLAGS.rnn_dropout,
         use_rnn_batch_norm=FLAGS.use_rnn_batch_norm,
         use_rnn_attention=FLAGS.use_rnn_attention,
         rnn_attention_hidden_size=FLAGS.rnn_attention_hidden_size,
         use_rnn_attention_batch_norm=FLAGS.use_rnn_attention_batch_norm,
         use_rnn_peepholes=FLAGS.use_rnn_peepholes,
+        rnn_output_type=FLAGS.rnn_output_type,
+        use_output_residual=FLAGS.use_output_residual,
+        output_residual_units=FLAGS.output_residual_units,
         use_output_highway=FLAGS.use_output_highway,
         output_highway_depth=FLAGS.output_highway_depth,
         output_highway_units=FLAGS.output_highway_units,
-
-        use_crf=FLAGS.use_crf, # True
+        use_crf=FLAGS.use_crf,  # True
         use_batch_renorm=FLAGS.use_batch_renorm,
         scale_label=FLAGS.scale_label,
         loss_pos_weight=FLAGS.loss_pos_weight,
-
         num_classes=FLAGS.num_classes,
-
         clip_gradients_std_factor=FLAGS.clip_gradients_std_factor,  # 2.
         clip_gradients_decay=FLAGS.clip_gradients_decay,  # 0.95
         # 6.
         clip_gradients_static_max_norm=FLAGS.clip_gradients_static_max_norm,
-
         learning_rate_decay_fn=FLAGS.learning_rate_decay_fn,
         learning_rate_decay_steps=FLAGS.learning_rate_decay_steps,  # 10000
         learning_rate_decay_rate=FLAGS.learning_rate_decay_rate,  # 0.9
@@ -4494,7 +4920,6 @@ def create_estimator_and_specs(run_config):
         warmup_schedule=FLAGS.warmup_schedule,  # exp
         optimizer=FLAGS.optimizer,
         adam_epsilon=FLAGS.adam_epsilon,
-
         check_nans=FLAGS.check_nans,
         trace=FLAGS.trace,
         debug=FLAGS.debug,
@@ -4510,14 +4935,15 @@ def create_estimator_and_specs(run_config):
     # hook = tf_debug.LocalCLIDebugHook()
 
     estimator = tf.estimator.Estimator(
-        model_fn=model_fn,
-        config=run_config,
-        params=model_params)
+        model_fn=model_fn, config=run_config, params=model_params
+    )
 
     # save model_params to model_dir/hparams.json
-    hparams_path = Path(estimator.model_dir,
-                     'hparams-{:%Y-%m-%d-%H-%M-%S}.json'.format(datetime.datetime.now()))
-    hparams_path.parent.mkdir(parents=True, exist_ok=True) # pylint: disable=no-member
+    hparams_path = Path(
+        estimator.model_dir,
+        'hparams-{:%Y-%m-%d-%H-%M-%S}.json'.format(datetime.datetime.now())
+    )
+    hparams_path.parent.mkdir(parents=True, exist_ok=True)  # pylint: disable=no-member
     hparams_path.write_text(model_params.to_json(indent=2, sort_keys=False))
 
     train_spec = tf.estimator.TrainSpec(
@@ -4572,9 +4998,9 @@ def main(unused_args):
     # host_script_name = ${HOSTSCRIPT}.${NUMGPU}
     model_dir_parts = Path(FLAGS.model_dir).name.split('_')
     if len(model_dir_parts) > 1:
-        if FLAGS.experiment_name == 'PARSE': # Default: Exp
+        if FLAGS.experiment_name == 'PARSE':  # Default: Exp
             FLAGS.experiment_name = model_dir_parts[0]
-        if FLAGS.host_script_name == 'PARSE': # Default: tensorflow
+        if FLAGS.host_script_name == 'PARSE':  # Default: tensorflow
             FLAGS.host_script_name = model_dir_parts[-1]
     # setup colored logger
     coloredlogs.DEFAULT_FIELD_STYLES = dict(
@@ -4582,7 +5008,8 @@ def main(unused_args):
         hostname=dict(color='magenta', bold=True),
         levelname=dict(color='black', bold=True),
         programname=dict(color='cyan', bold=True),
-        name=dict(color='blue'))
+        name=dict(color='blue')
+    )
     coloredlogs.DEFAULT_LEVEL_STYLES = dict(
         spam=dict(color='green', faint=True),
         debug=dict(color='green'),
@@ -4592,21 +5019,22 @@ def main(unused_args):
         warning=dict(color='yellow'),
         success=dict(color='green', bold=True),
         error=dict(color='red'),
-        critical=dict(color='red', bold=True))
+        critical=dict(color='red', bold=True)
+    )
     # '\x1b[32m%(asctime)s,%(msecs)03d\x1b[0m \x1b[1;35m%(hostname)s\x1b[0m \x1b[34m%(name)s[%(process)d]\x1b[0m \x1b[1;30m%(levelname)s\x1b[0m %(message)s'
     coloredlogs.DEFAULT_LOG_FORMAT = '%(asctime)s \x1b[1;35m{}\x1b[0m \x1b[34m{}[%(process)d]\x1b[0m %(levelname)s %(message)s'.format(
         FLAGS.experiment_name, FLAGS.host_script_name
     )
 
     if tfversion[0] == 1 and tfversion[1] <= 11:
-        logger = tf_logging._get_logger() # 1.11
+        logger = tf_logging._get_logger()  # 1.11
     else:
         # >>> logging.getLogger().handlers
         # [<ABSLHandler (NOTSET)>]
         # >>> logger = tf.get_logger()
         # >>> logger.handlers
         # []
-        logger = tf.get_logger() # 1.12 # pylint: disable=no-member
+        logger = tf.get_logger()  # 1.12 # pylint: disable=no-member
         if len(logging.getLogger().handlers) != 0:
             # Remove ABSLHandler
             logging.getLogger().handlers.pop()
@@ -4642,15 +5070,21 @@ def main(unused_args):
 
     # check tfrecords data exists
     if len(glob.glob(FLAGS.training_data)) == 0:
-        msg = 'No training data files found for pattern: {}'.format(FLAGS.training_data)
+        msg = 'No training data files found for pattern: {}'.format(
+            FLAGS.training_data
+        )
         tf.logging.fatal(msg)
         raise IOError(msg)
     if len(glob.glob(FLAGS.eval_data)) == 0:
-        msg = 'No evaluation data files found for pattern: {}'.format(FLAGS.eval_data)
+        msg = 'No evaluation data files found for pattern: {}'.format(
+            FLAGS.eval_data
+        )
         tf.logging.fatal(msg)
         raise IOError(msg)
     if len(glob.glob(FLAGS.metadata_path)) == 0:
-        msg = 'No metadata file found for pattern: {}'.format(FLAGS.metadata_path)
+        msg = 'No metadata file found for pattern: {}'.format(
+            FLAGS.metadata_path
+        )
         tf.logging.fatal(msg)
         raise IOError(msg)
 
@@ -4674,7 +5108,9 @@ def main(unused_args):
     # multi gpu distribution strategy
     distribution = None
     if FLAGS.num_gpus > 1:
-        distribution = tf.contrib.distribute.MirroredStrategy(num_gpus=FLAGS.num_gpus)
+        distribution = tf.contrib.distribute.MirroredStrategy(
+            num_gpus=FLAGS.num_gpus
+        )
         tf.logging.info('MirroredStrategy num_gpus: {}'.format(FLAGS.num_gpus))
 
     # Set the seeds
@@ -4688,9 +5124,9 @@ def main(unused_args):
     # session_config = tf.ConfigProto(log_device_placement=True)
     session_config = tf.ConfigProto(allow_soft_placement=True)
     # default session config when init Estimator
-    session_config.graph_options.rewrite_options.meta_optimizer_iterations = rewriter_config_pb2.RewriterConfig.ONE # pylint: disable=no-member
+    session_config.graph_options.rewrite_options.meta_optimizer_iterations = rewriter_config_pb2.RewriterConfig.ONE  # pylint: disable=no-member
     if FLAGS.use_jit_xla:
-        session_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1 # pylint: disable=no-member
+        session_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1  # pylint: disable=no-member
 
     estimator, train_spec, eval_spec = create_estimator_and_specs(
         run_config=tf.estimator.RunConfig(
@@ -4711,7 +5147,7 @@ def main(unused_args):
             # summaries are written to disk using a default SummarySaverHook. If both
             # `save_summaries_steps` and `save_summaries_secs` are set to `None`, then
             # the default summary saver isn't used. Default 100.
-            save_checkpoints_steps=None, # 100
+            save_checkpoints_steps=None,  # 100
             # Save checkpoints every this many steps.
             # save_checkpoints_secs=None,
             # We will define our own CheckpointSaverHook in EstimatorSpec.training_chief_hooks
@@ -4730,19 +5166,22 @@ def main(unused_args):
             # `checkpoint` file.  Presently the number is only roughly enforced.  For
             # example in case of restarts more than max_to_keep checkpoints may be
             # kept.
-            keep_checkpoint_every_n_hours=FLAGS.keep_checkpoint_every_n_hours,  # 6
+            keep_checkpoint_every_n_hours=FLAGS.
+            keep_checkpoint_every_n_hours,  # 6
             # keep an additional checkpoint
             # every `N` hours. For example, if `N` is 0.5, an additional checkpoint is
             # kept for every 0.5 hours of training, this is in addition to the
             # keep_checkpoint_max checkpoints.
             # Defaults to 10,000 hours.
-            log_step_count_steps=None, # Customized LoggingTensorHook defined in model_fn
+            log_step_count_steps=
+            None,  # Customized LoggingTensorHook defined in model_fn
             # if not None, a StepCounterHook will be added in MonitoredTrainingSession()
             # log_step_count_steps=FLAGS.log_step_count_steps,  # 10
             # The frequency, in number of global steps, that the
             # global step/sec will be logged during training.
-            session_config=session_config))
-
+            session_config=session_config
+        )
+    )
 
     if FLAGS.job == 'eval':
         if not FLAGS.eval_checkpoint:
@@ -4750,7 +5189,8 @@ def main(unused_args):
         tf.logging.info('Evaluating checkpoint: %s', FLAGS.eval_checkpoint)
         eval_result_metrics = estimator.evaluate(
             input_fn=eval_spec.input_fn,
-            steps=None, # Number of steps for which to evaluate model. If None, evaluates until input_fn raises an end-of-input exception.
+            steps=
+            None,  # Number of steps for which to evaluate model. If None, evaluates until input_fn raises an end-of-input exception.
             hooks=eval_spec.hooks,
             checkpoint_path=FLAGS.eval_checkpoint,
             name='evaluate'
@@ -4758,15 +5198,28 @@ def main(unused_args):
         global_step = eval_result_metrics['global_step']
         # save eval results
         if not FLAGS.eval_dir:
-            FLAGS.eval_dir = str(Path(FLAGS.model_dir) / 'eval-{}'.format(global_step))
+            FLAGS.eval_dir = str(
+                Path(FLAGS.model_dir) / 'eval-{}'.format(global_step)
+            )
         if not FLAGS.eval_prefix:
-            FLAGS.eval_prefix = '{}@{}'.format(Path(FLAGS.model_dir).name, global_step)
-        output_path = Path(FLAGS.eval_dir) / '{}-metrics.{}'.format(FLAGS.eval_prefix, 'json')
-        with output_path.open(encoding='utf-8', mode='a') as f: # pylint: disable=no-member
-            json.dump(eval_result_metrics, f, indent=2, sort_keys=False, cls=NumpyEncoder)
+            FLAGS.eval_prefix = '{}@{}'.format(
+                Path(FLAGS.model_dir).name, global_step
+            )
+        output_path = Path(FLAGS.eval_dir
+                          ) / '{}-metrics.{}'.format(FLAGS.eval_prefix, 'json')
+        with output_path.open(encoding='utf-8', mode='a') as f:  # pylint: disable=no-member
+            json.dump(
+                eval_result_metrics,
+                f,
+                indent=2,
+                sort_keys=False,
+                cls=NumpyEncoder
+            )
     elif FLAGS.job == 'export':
         if not FLAGS.export_checkpoint:
-            FLAGS.export_checkpoint = tf.train.latest_checkpoint(FLAGS.model_dir)
+            FLAGS.export_checkpoint = tf.train.latest_checkpoint(
+                FLAGS.model_dir
+            )
         if not FLAGS.export_dir:
             FLAGS.export_dir = str(Path(FLAGS.model_dir) / 'export')
         tf.logging.info('Exporting checkpoint: %s', FLAGS.export_checkpoint)
@@ -4804,7 +5257,8 @@ def main(unused_args):
     elif FLAGS.job == 'train':
         while True:
             eval_result_metrics, export_results = tf.estimator.train_and_evaluate(
-                estimator, train_spec, eval_spec)
+                estimator, train_spec, eval_spec
+            )
     # eval_result = _EvalResult(
     #   status=_EvalStatus.EVALUATED,
     #   metrics=metrics,
@@ -4821,6 +5275,7 @@ def main(unused_args):
     # estimator_spec = estimator._call_model_fn(features, labels, model_fn_lib.ModeKeys.TRAIN, estimator.config)
     # estimator._train_with_estimator_spec(estimator_spec, worker_hooks, hooks, global_step_tensor, saving_listeners)
     # _, loss = MonitoredTrainingSession.run([estimator_spec.train_op, estimator_spec.loss])
+
 
 # python main.py --training_data=/home/hotdogee/datasets/pfam-regions-d10-s20-train.tfrecords --eval_data=/home/hotdogee/datasets/pfam-regions-d10-s20-test.tfrecords --model_dir=./checkpoints/cent-d10-v1 --batch_size=64
 # python main.py --training_data=/home/hotdogee/datasets/pfam-regions-d0-s20-train.tfrecords --eval_data=/home/hotdogee/datasets/pfam-regions-d0-s20-test.tfrecords --model_dir=./checkpoints/d0-v1
@@ -4881,7 +5336,6 @@ def main(unused_args):
 # docker
 # python main.py --training_data=/hotdogee/datasets/pfam-regions-d0-s20-train.tfrecords --eval_data=/hotdogee/datasets/pfam-regions-d0-s20-test.tfrecords --num_classes=16715 --batch_size=2 --save_summary_steps=200 --log_step_count_steps=200 --decay_steps=10000 --learning_rate=0.01 --adam_epsilon=0.02 --model_dir=./checkpoints/cent-d0b2-26 --use_tensor_ops=true
 # python main.py --training_data=/hotdogee/datasets2/pfam-regions-d0-s20-p3-train.tfrecords --eval_data=/hotdogee/datasets2/pfam-regions-d0-s20-p3-test.tfrecords --metadata_path=/hotdogee/datasets2/pfam-regions-d0-s20-p3-meta.json --num_classes=16715 --batch_size=2 --save_summary_steps=200 --log_step_count_steps=200 --decay_steps=10000 --learning_rate=0.01 --adam_epsilon=0.02 --save_checkpoints_secs=400 --keep_checkpoint_max=2 --model_dir=./checkpoints/pfam-regions-d0-s20-p3/2690V4-TITAN-docker1806/b2-lr0.01-1
-
 
 # python main.py --training_data=C:\Users\Hotdogee\Documents\datasets/pfam-regions-d0-s20-train.tfrecords --eval_data=C:\Users\Hotdogee\Documents\datasets/pfam-regions-d0-s20-test.tfrecords --model_dir=./checkpoints/d0b2-13-5930k --num_classes=16715 --batch_size=2 --save_summary_steps=200 --log_step_count_steps=200 --decay_steps=1000000 --learning_rate=0.0003
 # OOM at 351600
@@ -4987,7 +5441,6 @@ def main(unused_args):
 # python main.py --training_data=/home/hotdogee/datasets/pfam-regions-d0-s20-train.tfrecords --eval_data=/home/hotdogee/datasets/pfam-regions-d0-s20-test.tfrecords --model_dir=./checkpoints/cent-d0b2-19 --num_classes=16715 --batch_size=2 --save_summary_steps=200 --log_step_count_steps=200 --decay_steps=1000000 --learning_rate=0.01 --adam_epsilon=0.01
 # 77.2% @ 1 epoch (353700 step), 81.5% @ 2 epoch (86,757,674 examples, 707400 step)
 
-
 # sequence count = 54,223,493, train = 43,378,794, test = 10,844,699
 # class count = 16715, batch size = 4, batch count = 13,555,873, batch per sec = 11, time per epoch = 1,232,352 sec = 14 days
 # 1950X: 13.5 step/sec, 8107 step@10min, tf1.9.0, win10
@@ -5034,480 +5487,610 @@ if __name__ == '__main__':
         '--model_dir',
         type=str,
         default='./checkpoints/Exp_tensorflow',
-        help='Path for saving model checkpoints during training')
+        help='Path for saving model checkpoints during training'
+    )
     parser.add_argument(
         '--experiment_name',
         type=str,
         default='Exp',
-        help='Experiment name for logging purposes, if "PARSE", split model_dir by "_" and use the first part as the experiment name')
+        help=
+        'Experiment name for logging purposes, if "PARSE", split model_dir by "_" and use the first part as the experiment name'
+    )
     parser.add_argument(
         '--host_script_name',
         type=str,
         default='tensorflow',
-        help='Host script name for logging purposes (8086K1-1.2), if "PARSE", split model_dir by "_" and use the last part as the host script name')
+        help=
+        'Host script name for logging purposes (8086K1-1.2), if "PARSE", split model_dir by "_" and use the last part as the host script name'
+    )
     parser.add_argument(
         '--job',
         type=str,
         choices=['train', 'eval', 'predict', 'dataprep', 'export'],
         default='train',
-        help='Set job type to run')
+        help='Set job type to run'
+    )
     parser.add_argument(
         '--export_dir',
         type=str,
         default='',
-        help='Path for saving the exported SavedModel. Default: ${model_dir}/export')
+        help=
+        'Path for saving the exported SavedModel. Default: ${model_dir}/export'
+    )
     parser.add_argument(
         '--export_checkpoint',
         type=str,
         default='',
-        help='Checkpoint to export to SavedModel, ex: "model_dir/step-380176". Default: latest checkpoint in model_dir')
+        help=
+        'Checkpoint to export to SavedModel, ex: "model_dir/step-380176". Default: latest checkpoint in model_dir'
+    )
     parser.add_argument(
         '--eval_checkpoint',
         type=str,
         default='',
-        help='Checkpoint to use for evaluation, ex: "model_dir/step-380176". Default: latest checkpoint in model_dir')
+        help=
+        'Checkpoint to use for evaluation, ex: "model_dir/step-380176". Default: latest checkpoint in model_dir'
+    )
     parser.add_argument(
         '--eval_dir',
         type=str,
         default='',
-        help='Path for saving evaluation results. Default: ${model_dir}/eval-${global_step}')
+        help=
+        'Path for saving evaluation results. Default: ${model_dir}/eval-${global_step}'
+    )
     parser.add_argument(
         '--eval_prefix',
         type=str,
         default='',
-        help='Filename prefix for evaluation results. Default: ${model_dir}@${global_step}')
+        help=
+        'Filename prefix for evaluation results. Default: ${model_dir}@${global_step}'
+    )
     parser.add_argument(
         '--eval_format',
         type=str,
         choices=['json', 'msgpack', 'msgpack.gz'],
         default='json',
-        help='File format of evaluation results, one of ["json", "msgpack", "msgpack.gz"]. Default: json')
+        help=
+        'File format of evaluation results, one of ["json", "msgpack", "msgpack.gz"]. Default: json'
+    )
     parser.add_argument(
         '--eval_level',
         type=str,
         choices=['topk', 'min'],
         default='min',
-        help='Amount of data saved by evaluation, one of ["topk", "min"]. Default: min')
+        help=
+        'Amount of data saved by evaluation, one of ["topk", "min"]. Default: min'
+    )
     parser.add_argument(
         '--predict_top_k',
         type=int,
         default=3,  #
-        help='Save only the top k most probable classes for each amino acid.')
+        help='Save only the top k most probable classes for each amino acid.'
+    )
     parser.add_argument(
         '--training_data',
         type=str,
         # default='D:/datasets/pfam-regions-d0-s20/pfam-regions-d0-s20-train.tfrecords',
         default='D:/datasets/pfam-regions-d10-s20-train.tfrecords',
-        help='Path to training data (tf.Example in TFRecord format)')
+        help='Path to training data (tf.Example in TFRecord format)'
+    )
     parser.add_argument(
         '--eval_data',
         type=str,
         # default='D:/datasets/pfam-regions-d0-s20/pfam-regions-d0-s20-test.tfrecords',
         default='D:/datasets/pfam-regions-d10-s20-test.tfrecords',
-        help='Path to evaluation data (tf.Example in TFRecord format)')
+        help='Path to evaluation data (tf.Example in TFRecord format)'
+    )
     parser.add_argument(
         '--data_version',
         type=str,
         default='v2',
-        help='Data format version of training and evaluation data. v1 uses SequenceExample, v2 uses Example')
+        help=
+        'Data format version of training and evaluation data. v1 uses SequenceExample, v2 uses Example'
+    )
     parser.add_argument(
         '--metadata_path',
         type=str,
         # default='D:/datasets/pfam-regions-d0-s20/pfam-regions-d0-s20-test.tfrecords',
         default='',
-        help='Path to metadata.json generated by prep_dataset')
+        help='Path to metadata.json generated by prep_dataset'
+    )
     parser.add_argument(
         '--num_classes',
         type=int,
         # default=16712 + 3, # 'PAD', 'NO_DOMAIN', 'UNKNOWN_DOMAIN'
         default=-1,  # 'PAD', 'NO_DOMAIN', 'UNKNOWN_DOMAIN'
-        help='Number of domain classes.')
+        help='Number of domain classes.'
+    )
     parser.add_argument(
         '--classes_file',
         type=str,
         default='',
-        help='Path to a file with the classes - one class per line')
+        help='Path to a file with the classes - one class per line'
+    )
 
     parser.add_argument(
         '--num_gpus',
         type=int,
         default=0,
-        help='Number of GPUs to use, defaults to total number of gpus available.')
+        help='Number of GPUs to use, defaults to total number of gpus available.'
+    )
     parser.add_argument(
         '--num_cpu_threads',
         type=int,
         default=0,
-        help='Number of CPU threads to use, defaults to half the number of hardware threads.')
+        help=
+        'Number of CPU threads to use, defaults to half the number of hardware threads.'
+    )
     parser.add_argument(
-        '--random_seed',
-        type=int,
-        default=33,
-        help='The random seed.')
+        '--random_seed', type=int, default=33, help='The random seed.'
+    )
     parser.add_argument(
         '--use_jit_xla',
         type='bool',
         default='False',
-        help='Whether to enable JIT XLA.')
+        help='Whether to enable JIT XLA.'
+    )
     parser.add_argument(
         '--use_tensor_ops',
         type='bool',
         default='False',
-        help='Whether to use tensorcores or not.')
+        help='Whether to use tensorcores or not.'
+    )
     parser.add_argument(
         '--save_summary_steps',
         type=int,
         default=100,
-        help='Save summaries every this many steps.')
+        help='Save summaries every this many steps.'
+    )
     parser.add_argument(
         '--save_checkpoints_steps',
         type=int,
         default=100,
-        help='Save checkpoints every this many steps.')
+        help='Save checkpoints every this many steps.'
+    )
     parser.add_argument(
         '--save_checkpoints_secs',
         type=int,
         default=10 * 60,
-        help='Save checkpoints every this many seconds.')
+        help='Save checkpoints every this many seconds.'
+    )
     parser.add_argument(
         '--keep_checkpoint_max',
         type=int,
         default=5,
-        help='The maximum number of recent checkpoint files to keep.')
+        help='The maximum number of recent checkpoint files to keep.'
+    )
     parser.add_argument(
         '--keep_checkpoint_every_n_hours',
         type=float,
         default=6,
-        help='Keep an additional checkpoint every `N` hours.')
+        help='Keep an additional checkpoint every `N` hours.'
+    )
     parser.add_argument(
         '--log_step_count_steps',
         type=int,
         default=100,
-        help='The frequency, in number of global steps, that the global step/sec will be logged during training.')
+        help=
+        'The frequency, in number of global steps, that the global step/sec will be logged during training.'
+    )
     parser.add_argument(
         '--eval_delay_secs',
         type=int,
         default=30 * 24 * 60 * 60,
-        help='Start distributed continuous evaluation after waiting for this many seconds. Not used in local training.')
+        help=
+        'Start distributed continuous evaluation after waiting for this many seconds. Not used in local training.'
+    )
     parser.add_argument(
         '--eval_throttle_secs',
         type=int,
         default=30 * 24 * 60 * 60,
-        help='Stop training and start evaluation after this many seconds.')
+        help='Stop training and start evaluation after this many seconds.'
+    )
 
     parser.add_argument(
         '--steps',
         type=int,
         default=0,  # 100000,
-        help='Number of training steps, if 0 train forever.')
+        help='Number of training steps, if 0 train forever.'
+    )
     parser.add_argument(
         '--eval_steps',
         type=int,
         default=100,  # 100000,
-        help='Number of evaluation steps, if 0, evaluates until end-of-input.')
+        help='Number of evaluation steps, if 0, evaluates until end-of-input.'
+    )
 
     parser.add_argument(
         '--dataset_buffer',
         type=int,
         default=256,
-        help='Number of MB in the read buffer.')
+        help='Number of MB in the read buffer.'
+    )
     parser.add_argument(
         '--dataset_parallel_reads',
         type=int,
         default=1,
-        help='Number of input Datasets to interleave from in parallel.')
+        help='Number of input Datasets to interleave from in parallel.'
+    )
     parser.add_argument(
         '--shuffle_buffer',
         type=int,
         default=16 * 1024,
-        help='Maximum number elements that will be buffered when shuffling input.')
+        help='Maximum number elements that will be buffered when shuffling input.'
+    )
     parser.add_argument(
         '--repeat_count',
         type=int,
         default=1,
-        help='Number of times the dataset should be repeated.')
+        help='Number of times the dataset should be repeated.'
+    )
     parser.add_argument(
         '--batch_size',
         type=int,
         default=2,
-        help='Batch size to use for longest sequence for training/evaluation. 1 if GPU Memory <= 6GB, 2 if <= 12GB')
+        help=
+        'Batch size to use for longest sequence for training/evaluation. 1 if GPU Memory <= 6GB, 2 if <= 12GB'
+    )
     parser.add_argument(
         '--prefetch_buffer',
         type=int,
         default=64,
-        help='Maximum number of batches that will be buffered when prefetching.')
+        help='Maximum number of batches that will be buffered when prefetching.'
+    )
 
     parser.add_argument(
         '--vocab_size',
         type=int,
         default=len(aa_list),  # 'PAD'
-        help='Vocabulary size.')
+        help='Vocabulary size.'
+    )
     parser.add_argument(
-        '--embed_dim',
-        type=int,
-        default=32,
-        help='Embedding dimensions.')
+        '--embed_dim', type=int, default=32, help='Embedding dimensions.'
+    )
     parser.add_argument(
         '--embedded_dropout',
         type=float,
         default=0.2,
-        help='Dropout rate used for embedding layer outputs.')
+        help='Dropout rate used for embedding layer outputs.'
+    )
 
     parser.add_argument(
         '--use_conv_1_prenet',
         type='bool',
         default='True',
-        help='Add prenet before convolution layer 1.')
+        help='Add prenet before convolution layer 1.'
+    )
     parser.add_argument(
         '--conv_1_prenet_dropout',
         type=float,
         default=0.2,
-        help='Dropout rate used for prenet layer outputs.')
+        help='Dropout rate used for prenet layer outputs.'
+    )
     parser.add_argument(
         '--use_conv_1_bank',
         type='bool',
         default='True',
-        help='Use convolution bank.')
+        help='Use convolution bank.'
+    )
     parser.add_argument(
         '--use_conv_1_bank_odd',
         type='bool',
         default='False',
-        help='Use convolution bank with only odd kernel sizes.')
+        help='Use convolution bank with only odd kernel sizes.'
+    )
     parser.add_argument(
         '--conv_1_bank_size',
         type=int,
         default=16,
-        help='Convolution bank kernal sizes 1 to bank_size.')
+        help='Convolution bank kernal sizes 1 to bank_size.'
+    )
     parser.add_argument(
         '--conv_1_filters',
         type=int,
         default=32,
-        help='Number of convolution filters.')
+        help='Number of convolution filters.'
+    )
     parser.add_argument(
         '--conv_1_kernel_size',
         type=int,
         default=7,
-        help='Length of the convolution filters.')
+        help='Length of the convolution filters.'
+    )
     parser.add_argument(
         '--conv_1_strides',
         type=int,
         default=1,
-        help='The number of entries by which the filter is moved right at each step..')
+        help=
+        'The number of entries by which the filter is moved right at each step..'
+    )
     parser.add_argument(
         '--conv_1_dropout',
         type=float,
         default=0.2,
-        help='Dropout rate used for convolution layer outputs.')
+        help='Dropout rate used for convolution layer outputs.'
+    )
     parser.add_argument(
         '--use_conv_batch_norm',
         type='bool',
         default='True',
-        help='Apply batch normalization after convolution layers.')
+        help='Apply batch normalization after convolution layers.'
+    )
     parser.add_argument(
         '--use_conv_1_residual',
         type='bool',
         default='True',
-        help='Add residual connection after convolution layer 1.')
+        help='Add residual connection after convolution layer 1.'
+    )
     parser.add_argument(
         '--use_conv_1_highway',
         type='bool',
         default='True',
-        help='Add a highway network after convolution layer 1.')
+        help='Add a highway network after convolution layer 1.'
+    )
     parser.add_argument(
         '--conv_1_highway_depth',
         type=int,
         default=3,
-        help='Number of layers of highway network.')
+        help='Number of layers of highway network.'
+    )
     parser.add_argument(
         '--conv_1_highway_units',
         type=int,
         default=32,
-        help='Number of units per layer of highway network.')
+        help='Number of units per layer of highway network.'
+    )
     parser.add_argument(
         '--use_conv_1_attention',
         type='bool',
         default='True',
-        help='Add an attention layer after convolution layer 1.')
+        help='Add an attention layer after convolution layer 1.'
+    )
     parser.add_argument(
         '--attention_key_channels',
         type=int,
         default=32,
-        help='Number of attention key units.')
+        help='Number of attention key units.'
+    )
     parser.add_argument(
         '--attention_value_channels',
         type=int,
         default=32,
-        help='Number of attention value units.')
+        help='Number of attention value units.'
+    )
     parser.add_argument(
         '--attention_hidden_size',
         type=int,
         default=32,
-        help='Number of attention units.')
+        help='Number of attention units.'
+    )
     parser.add_argument(
         '--attention_num_heads',
         type=int,
         default=1,
-        help='Number of attention heads.')
+        help='Number of attention heads.'
+    )
     parser.add_argument(
         '--attention_dropout',
         type=float,
         default=0.0,
-        help='Dropout rate used for attention.')
+        help='Dropout rate used for attention.'
+    )
     parser.add_argument(
         '--attention_type',
         type=str,
         choices=['local_unmasked', 'dot_product'],
         default='local_unmasked',
-        help='Attention Type')
+        help='Attention Type'
+    )
     parser.add_argument(
         '--attention_block_length',
         type=int,
         default=128,
-        help='The sequence is divided into blocks of length block_length.')
+        help='The sequence is divided into blocks of length block_length.'
+    )
     parser.add_argument(
         '--attention_filter_width',
         type=int,
         default=64,
-        help='Attention for a given query position can see all memory positions in the corresponding block and filter_width many positions to the left and right of the block.')
+        help=
+        'Attention for a given query position can see all memory positions in the corresponding block and filter_width many positions to the left and right of the block.'
+    )
     parser.add_argument(
         '--use_conv_1_attention_batch_norm',
         type='bool',
         default='True',
-        help='Apply batch normalization after convolution attention layers.')
+        help='Apply batch normalization after convolution attention layers.'
+    )
 
     parser.add_argument(
         '--rnn_cell_type',
         type=str,
-        choices=['CudnnLSTM', 'CudnnGRU', 'LSTMCell', 'GRUCell', 'LayerNormLSTMCell', 'LayerNormLSTMCellv2', 'LSTMBlockFusedCell', 'GRUBlockCellV2', 'SRUCell', 'qrnn'],
+        choices=[
+            'CudnnLSTM', 'CudnnGRU', 'LSTMCell', 'GRUCell', 'LayerNormLSTMCell',
+            'LayerNormLSTMCellv2', 'LSTMBlockFusedCell', 'GRUBlockCellV2',
+            'SRUCell', 'qrnn'
+        ],
         default='CudnnGRU',
-        help='RNN Cell Type')
+        help='RNN Cell Type'
+    )
     parser.add_argument(
         '--rnn_num_units',
         type='list',
         default='[128]',
-        help='Number of node per recurrent network layer.')
+        help='Number of node per recurrent network layer.'
+    )
     parser.add_argument(
         '--rnn_dropout',
         type=float,
         default=0.0,
-        help='Dropout rate used between rnn layers.')
+        help='Dropout rate used between rnn layers.'
+    )
     parser.add_argument(
         '--use_rnn_batch_norm',
         type='bool',
         default='True',
-        help='Apply batch normalization after recurrent layers.')
+        help='Apply batch normalization after recurrent layers.'
+    )
     parser.add_argument(
         '--use_rnn_attention',
         type='bool',
         default='True',
-        help='Add an attention layer after recurrent layers.')
+        help='Add an attention layer after recurrent layers.'
+    )
     parser.add_argument(
         '--rnn_attention_hidden_size',
         type=int,
         default=128,
-        help='Number of recurrent network layer attention output nodes.')
+        help='Number of recurrent network layer attention output nodes.'
+    )
     parser.add_argument(
         '--use_rnn_attention_batch_norm',
         type='bool',
         default='True',
-        help='Apply batch normalization after rnn attention layers.')
+        help='Apply batch normalization after rnn attention layers.'
+    )
     parser.add_argument(
         '--use_rnn_peepholes',
         type='bool',
         default='False',
-        help='Enable diagonal/peephole connections in LayerNormLSTMCellv2 and LSTMBlockFusedCell cells.')
+        help=
+        'Enable diagonal/peephole connections in LayerNormLSTMCellv2 and LSTMBlockFusedCell cells.'
+    )
+    parser.add_argument(
+        '--rnn_output_type',
+        type=str,
+        default='batch_length',
+        choices=['batch_length', 'seq_length'],
+        help='Values to send to next layer.'
+    )
+    parser.add_argument(
+        '--use_output_residual',
+        type='bool',
+        default='False',
+        help='Add a residual network after rnn.'
+    )
+    parser.add_argument(
+        '--output_residual_units',
+        type='list',
+        default='[512,1024,2048,4096]',
+        help='Residual network configuration.'
+    )
     parser.add_argument(
         '--use_output_highway',
         type='bool',
         default='True',
-        help='Add a highway network after rnn.')
+        help='Add a highway network after rnn.'
+    )
     parser.add_argument(
         '--output_highway_depth',
         type=int,
         default=1,
-        help='Number of layers of output highway network.')
+        help='Number of layers of output highway network.'
+    )
     parser.add_argument(
         '--output_highway_units',
         type=int,
         default=1024,
-        help='Number of units per layer of output highway network.')
+        help='Number of units per layer of output highway network.'
+    )
 
     parser.add_argument(
         '--use_crf',
         type='bool',
         default='False',
-        help='Calculate loss using linear chain CRF instead of Softmax.')
+        help='Calculate loss using linear chain CRF instead of Softmax.'
+    )
     parser.add_argument(
         '--use_batch_renorm',
         type='bool',
         default='True',
-        help='Use Batch Renormalization.')
+        help='Use Batch Renormalization.'
+    )
     parser.add_argument(
         '--scale_label',
         type=float,
         default=0.6,
-        help='Scale labels to keep weights from exploding.')
+        help='Scale labels to keep weights from exploding.'
+    )
     parser.add_argument(
         '--loss_pos_weight',
         type=float,
         default=1.0,
-        help='A value pos_weight > 1 decreases the false negative count, hence increasing the recall. Conversely setting pos_weight < 1 decreases the false positive count and increases the precision.')
+        help=
+        'A value pos_weight > 1 decreases the false negative count, hence increasing the recall. Conversely setting pos_weight < 1 decreases the false positive count and increases the precision.'
+    )
 
     parser.add_argument(
         '--clip_gradients_std_factor',
         type=float,
         default=2.,  # num_batches_per_epoch * num_epochs_per_decay(8)
-        help='If the norm exceeds `exp(mean(log(norm)) + std_factor*std(log(norm)))` then all gradients will be rescaled such that the global norm becomes `exp(mean)`.')
+        help=
+        'If the norm exceeds `exp(mean(log(norm)) + std_factor*std(log(norm)))` then all gradients will be rescaled such that the global norm becomes `exp(mean)`.'
+    )
     parser.add_argument(
         '--clip_gradients_decay',
         type=float,
         default=0.95,
-        help='The smoothing factor of the moving averages.')
+        help='The smoothing factor of the moving averages.'
+    )
     parser.add_argument(
         '--clip_gradients_static_max_norm',
         type=float,
         default=6.,
-        help='If provided, will threshold the norm to this value as an extra safety.')
+        help=
+        'If provided, will threshold the norm to this value as an extra safety.'
+    )
 
     parser.add_argument(
         '--learning_rate_decay_fn',
         type=str,
         default='None',
-        help='Learning rate decay function. One of "none", "noisy_linear_cosine_decay", "exponential_decay"')
+        help=
+        'Learning rate decay function. One of "none", "noisy_linear_cosine_decay", "exponential_decay"'
+    )
     parser.add_argument(
         '--learning_rate_decay_steps',
         type=int,
         default=27000000,  # num_batches_per_epoch * num_epochs_per_decay(8)
-        help='Decay learning_rate by decay_rate every decay_steps.')
+        help='Decay learning_rate by decay_rate every decay_steps.'
+    )
     parser.add_argument(
         '--learning_rate_decay_rate',
         type=float,
         default=0.95,
-        help='Learning rate decay rate.')
+        help='Learning rate decay rate.'
+    )
     parser.add_argument(
         '--learning_rate',
         type=float,
         default=0.001,
-        help='Learning rate used for training.')
+        help='Learning rate used for training.'
+    )
     parser.add_argument(
         '--warmup_steps',
         type=int,
         default=35000,  # 10% epoch
-        help='Learning rate warmup steps needed to reach specified learning_rate.')
+        help='Learning rate warmup steps needed to reach specified learning_rate.'
+    )
     parser.add_argument(
         '--warmup_repeat_steps',
         type=int,
         default=0,  # 0 to disable repeat warmup
-        help='Restart warmup every this many steps.')
+        help='Restart warmup every this many steps.'
+    )
     parser.add_argument(
         '--warmup_start_lr',
         type=float,
         default=0.001,
-        help='Learning rate warmup starting multiplier value.')
+        help='Learning rate warmup starting multiplier value.'
+    )
     parser.add_argument(
         '--warmup_schedule',
         type=str,
         default='exp',
-        help='Learning rate warmup schedule. One of "exp", "linear", "none"')
+        help='Learning rate warmup schedule. One of "exp", "linear", "none"'
+    )
     # learning rate defaults
     # Adagrad: 0.01
     # Adam: 0.001
@@ -5521,28 +6104,34 @@ if __name__ == '__main__':
         '--optimizer',
         type=str,
         default='Adam',
-        help='Optimizer to use. One of "Adagrad", "Adam", "Ftrl", "Momentum", "RMSProp", "SGD"')
+        help=
+        'Optimizer to use. One of "Adagrad", "Adam", "Ftrl", "Momentum", "RMSProp", "SGD"'
+    )
     parser.add_argument(
         '--adam_epsilon',
         type=float,
         default=0.1,
-        help='A small constant for numerical stability. This epsilon is "epsilon hat" in the Kingma and Ba paper (in the formula just before Section 2.1), not the epsilon in Algorithm 1 of the paper.')
+        help=
+        'A small constant for numerical stability. This epsilon is "epsilon hat" in the Kingma and Ba paper (in the formula just before Section 2.1), not the epsilon in Algorithm 1 of the paper.'
+    )
 
     parser.add_argument(
         '--check_nans',
         type='bool',
         default='False',
-        help='Add runtime checks to spot when NaNs or other symptoms of numerical errors start occurring during training.')
+        help=
+        'Add runtime checks to spot when NaNs or other symptoms of numerical errors start occurring during training.'
+    )
     parser.add_argument(
         '--trace',
         type='bool',
         default='False',
-        help='Captures CPU/GPU profiling information in "timeline-<step>.json", which are in Chrome Trace format.')
+        help=
+        'Captures CPU/GPU profiling information in "timeline-<step>.json", which are in Chrome Trace format.'
+    )
     parser.add_argument(
-        '--debug',
-        type='bool',
-        default='False',
-        help='Run debugging ops.')
+        '--debug', type='bool', default='False', help='Run debugging ops.'
+    )
     # parser.add_argument(
     #     '--num_layers',
     #     type=int,
@@ -5607,11 +6196,9 @@ if __name__ == '__main__':
 # tf.app.flags.DEFINE_integer('shuffle', True,
 #                             'Whether to shuffle dataset.')
 
-
 # # Evaluation
 # tf.app.flags.DEFINE_integer('min_eval_frequency', 1024,
 #                             'Frequency to do evaluation run.')
-
 
 # # Globals
 # tf.app.flags.DEFINE_integer('random_seed', 1234,
@@ -5625,7 +6212,6 @@ if __name__ == '__main__':
 #   'hyperparameters_path',
 #   'alignment/models/configurations/single_layer.json',
 #   'The path to the hyperparameters.')
-
 
 # def run_experiment(unused_argv):
 #   """Run the training experiment."""
@@ -5670,7 +6256,6 @@ if __name__ == '__main__':
 #     run_config=run_config,
 #     schedule='train_and_evaluate',
 #     hparams=params)
-
 
 # if __name__ == '__main__':
 #   tf.app.run(main=run_experiment)
