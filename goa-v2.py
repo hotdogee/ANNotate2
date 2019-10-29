@@ -3761,10 +3761,8 @@ def model_fn(features, labels, mode, params, config):
 
     source_vocab_size = len(aa_list)
     target_vocab_size = params.num_classes
-    enc_units = params.rnn_num_units[0]
-    # dec_units = params.rnn_num_units[0] # needs to be the same as enc_units
 
-    encoder = Encoder(source_vocab_size, params.embed_dim, enc_units, batch_size)
+    encoder = Encoder(source_vocab_size, params.encoder_embed_dim, params.encoder_num_units[0], batch_size)
 
     encoder_state = encoder.initialize_hidden_state()
 
@@ -3772,25 +3770,25 @@ def model_fn(features, labels, mode, params, config):
     # enc_output shape=(batch_size, sequence_length, enc_units), dtype=float32
     # encoder_state shape=(batch_size, enc_units), dtype=float32
 
-    # decoder = Decoder(target_vocab_size, params.embed_dim, dec_units, batch_size)
+    # decoder = Decoder(target_vocab_size, params.decoder_embed_dim, dec_units, batch_size)
     with tf.variable_scope("decoder") as decoder_scope:
-        target_embedding = tf.keras.layers.Embedding(target_vocab_size, params.target_embed_dim)
-        target_embedded = target_embedding(go[:,:-1])
+        decoder_embedding = tf.keras.layers.Embedding(target_vocab_size, params.decoder_embed_dim) # 1024
+        target_embedded = decoder_embedding(go[:,:-1])
         attention_mechanism = attention_wrapper.BahdanauAttention(
-            num_units=params.attention_num_units,
+            num_units=params.attention_num_units, # 1024
             memory=enc_output,
             memory_sequence_length=source_sequence_lengths,
             normalize=True, dtype=float_type)
-        
+
         cell_list = []
-        for i, units in enumerate(params.decoder_num_units):
+        for i, units in enumerate(params.decoder_num_units): # [256,256,256,256]
             # cell
             single_cell = tf.contrib.rnn.GRUCell(num_units=units, dtype=float_type)
             # Dropout (= 1 - keep_prob)
-            if params.decoder_dropout > 0.0:
+            if params.decoder_dropout > 0.0: # 0.0
                 single_cell = tf.contrib.rnn.DropoutWrapper(cell=single_cell, input_keep_prob=(1.0 - params.decoder_dropout))
             # Residual
-            if i >= len(params.decoder_num_units) - params.decoder_num_residual_layers:
+            if i >= len(params.decoder_num_units) - params.decoder_num_residual_layers: # 2
                 single_cell = tf.contrib.rnn.ResidualWrapper(single_cell, residual_fn=gnmt_residual_fn)
             cell_list.append(single_cell)
         # Only wrap the bottom layer with the attention mechanism.
@@ -3815,7 +3813,7 @@ def model_fn(features, labels, mode, params, config):
             initial_state=decoder_initial_state,
             dtype=float_type,
             scope=decoder_scope,
-            parallel_iterations=params.dynamic_rnn_parallel_iterations,
+            parallel_iterations=params.dynamic_rnn_parallel_iterations, # 32
             time_major=False)
         output_layer = tf.layers.Dense(
             units=target_vocab_size, use_bias=False, name="output_projection",
@@ -3832,13 +3830,13 @@ def model_fn(features, labels, mode, params, config):
             # losses shape=(batch_size, target_sequence_lengths), dtype=float32
             mask = tf.sequence_mask(lengths=target_sequence_lengths,maxlen=tf.shape(target_output)[1],dtype=losses.dtype)
             masked_losses = losses * mask
-            loss = tf.reduce_sum(masked_losses) / tf.cast(tf.reduce_sum(target_sequence_lengths), dtype=tf.float32)
+            batch_loss = tf.reduce_sum(masked_losses) / tf.cast(tf.reduce_sum(target_sequence_lengths), dtype=tf.float32)
 
     # predictions
     with tf.variable_scope('predictions'):
         all_probs = tf.nn.softmax(logits=logits, axis=-1, name='softmax_tensor')
         # with tf.device('/cpu:0'):
-        top_probs, top_classes = tf.nn.top_k(all_probs, params.predict_top_k)
+        top_probs, top_classes = tf.nn.top_k(all_probs, params.predict_top_k) # 3
         predictions = {
             # 'logits': logits,
             # Add `softmax_tensor` to the graph.
@@ -4423,7 +4421,8 @@ def create_estimator_and_specs(run_config):
         batch_size=FLAGS.batch_size,
         prefetch_buffer=FLAGS.prefetch_buffer,  # batches
         vocab_size=FLAGS.vocab_size,  # 28
-        embed_dim=FLAGS.embed_dim,  # 32
+        encoder_embed_dim=FLAGS.encoder_embed_dim,  # 32
+        decoder_embed_dim=FLAGS.decoder_embed_dim,  # 1024
         embedded_dropout=FLAGS.embedded_dropout,  # 0.2
         use_conv_1_prenet=FLAGS.use_conv_1_prenet,  # 32
         conv_1_prenet_dropout=FLAGS.conv_1_prenet_dropout,  # 32
@@ -4450,8 +4449,12 @@ def create_estimator_and_specs(run_config):
         attention_filter_width=FLAGS.attention_filter_width,
         use_conv_1_attention_batch_norm=FLAGS.use_conv_1_attention_batch_norm,
         rnn_cell_type=FLAGS.rnn_cell_type,
-        rnn_num_units=FLAGS.rnn_num_units,  # list
-        rnn_dropout=FLAGS.rnn_dropout,
+        encoder_num_units=FLAGS.encoder_num_units,  # list [256,256,256,256]
+        decoder_num_units=FLAGS.decoder_num_units,  # list [256,256,256,256]
+        attention_num_units=FLAGS.attention_num_units, # 1024
+        decoder_num_residual_layers=FLAGS.decoder_num_residual_layers, # 2
+        dynamic_rnn_parallel_iterations=FLAGS.dynamic_rnn_parallel_iterations, # 32
+        decoder_dropout=FLAGS.decoder_dropout, # 0.0
         use_rnn_batch_norm=FLAGS.use_rnn_batch_norm,
         use_rnn_attention=FLAGS.use_rnn_attention,
         rnn_attention_hidden_size=FLAGS.rnn_attention_hidden_size,
@@ -5313,7 +5316,10 @@ if __name__ == '__main__':
         help='Vocabulary size.'
     )
     parser.add_argument(
-        '--embed_dim', type=int, default=32, help='Embedding dimensions.'
+        '--encoder_embed_dim', type=int, default=32, help='Encoder embedding dimensions.'
+    )
+    parser.add_argument(
+        '--decoder_embed_dim', type=int, default=1024, help='Decoder embedding dimensions.'
     )
     parser.add_argument(
         '--embedded_dropout',
@@ -5482,16 +5488,40 @@ if __name__ == '__main__':
         help='RNN Cell Type'
     )
     parser.add_argument(
-        '--rnn_num_units',
+        '--encoder_num_units',
         type='list',
-        default='[128]',
-        help='Number of node per recurrent network layer.'
+        default='[256,256,256,256]',
+        help='Encoder recurrent network size.'
     )
     parser.add_argument(
-        '--rnn_dropout',
+        '--decoder_num_units',
+        type='list',
+        default='[256,256,256,256]',
+        help='Encoder recurrent network size.'
+    )
+    parser.add_argument(
+        '--attention_num_units',
+        type=int,
+        default=1024,
+        help='The depth of the query mechanism.'
+    )
+    parser.add_argument(
+        '--decoder_num_residual_layers',
+        type=int,
+        default=2,
+        help='Number of residual layers from top to bottom. For example, if `len(decoder_num_units)=4` and `decoder_num_residual_layers=2`, the last 2 RNN cells in the returned list will be wrapped with `ResidualWrapper`.'
+    )
+    parser.add_argument(
+        '--dynamic_rnn_parallel_iterations',
+        type=int,
+        default=32,
+        help='The number of rnn iterations to run in parallel.'
+    )
+    parser.add_argument(
+        '--decoder_dropout',
         type=float,
         default=0.0,
-        help='Dropout rate used between rnn layers.'
+        help='Dropout rate used between decoder rnn layers.'
     )
     parser.add_argument(
         '--use_rnn_batch_norm',
