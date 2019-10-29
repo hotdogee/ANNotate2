@@ -59,6 +59,7 @@ from tensorflow.python.platform import tf_logging
 import numpy as np
 import coloredlogs
 from tqdm import tqdm
+import attention_wrapper
 
 _NEG_INF = -1e9
 
@@ -3384,8 +3385,8 @@ def parse_example_go_v2(serialized, mode):
             name=None
         )
         # tf.Tensor: shape=(go_total,), dtype=uint16
-        go = tf.cast(x=go, dtype=tf.float32, name=None)
-        # tf.Tensor: shape=(go_total,), dtype=float32
+        go = tf.cast(x=go, dtype=tf.int32, name=None)
+        # tf.Tensor: shape=(go_total,), dtype=int32
         go_lengths = tf.shape(input=go, name=None, out_type=tf.int32)[0]
         del parsed['go']
         label = {'go': go, 'go_lengths': go_lengths}
@@ -3580,24 +3581,28 @@ class BahdanauAttention(tf.keras.layers.Layer):
         self.V = tf.keras.layers.Dense(1)
 
     def call(self, query, values):
+        # query shape=(batch_size, enc_units), dtype=float32
+        # values shape=(batch_size, sequence_length, enc_units), dtype=float32
+
         # hidden shape == (batch_size, hidden size)
         # hidden_with_time_axis shape == (batch_size, 1, hidden size)
         # we are doing this to perform addition to calculate the score
         hidden_with_time_axis = tf.expand_dims(query, 1)
+        # hidden_with_time_axis shape=(batch_size, 1, enc_units), dtype=float32
 
-        # score shape == (batch_size, max_length, 1)
         # we get 1 at the last axis because we are applying score to self.V
         # the shape of the tensor before applying self.V is (batch_size, max_length, units)
         score = self.V(
             tf.nn.tanh(self.W1(values) + self.W2(hidden_with_time_axis))
         )
+        # hidden_with_time_axis shape=(batch_size, sequence_length, 1), dtype=float32
 
-        # attention_weights shape == (batch_size, max_length, 1)
         attention_weights = tf.nn.softmax(score, axis=1)
+        # attention_weights shape=(batch_size, sequence_length, 1), dtype=float32
 
-        # context_vector shape after sum == (batch_size, hidden_size)
         context_vector = attention_weights * values
         context_vector = tf.reduce_sum(context_vector, axis=1)
+        # context_vector shape=(batch_size, enc_units), dtype=float32
 
         return context_vector, attention_weights
 
@@ -3620,25 +3625,102 @@ class Decoder(tf.keras.Model):
         self.attention = BahdanauAttention(self.dec_units)
 
     def call(self, x, hidden, enc_output):
-        # enc_output shape == (batch_size, max_length, hidden_size)
+        # x shape=(batch_size, 1), dtype=float32
+        # hidden shape=(batch_size, enc_units), dtype=float32
+        # enc_output shape=(batch_size, sequence_length, enc_units), dtype=float32
         context_vector, attention_weights = self.attention(hidden, enc_output)
+        # context_vector shape=(batch_size, enc_units), dtype=float32
+        # attention_weights shape=(batch_size, max_length, 1), dtype=float32
 
         # x shape after passing through embedding == (batch_size, 1, embedding_dim)
         x = self.embedding(x)
+        # x shape=(batch_size, 1, embedding_dim), dtype=float32
 
         # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
         x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
+        # x shape=(batch_size, 1, embedding_dim + enc_units), dtype=float32
 
         # passing the concatenated vector to the GRU
         output, state = self.gru(x)
+        # output shape=(batch_size, 1, dec_units), dtype=float32
+        # state shape=(batch_size, dec_units), dtype=float32
 
-        # output shape == (batch_size * 1, hidden_size)
+        # output shape == (batch_size * 1, dec_units)
         output = tf.reshape(output, (-1, output.shape[2]))
+        # output shape=(batch_size, dec_units), dtype=float32
 
         # output shape == (batch_size, vocab)
         x = self.fc(output)
+        # output shape=(batch_size, target_vocab_size), dtype=float32
 
         return x, state, attention_weights
+
+
+class GNMTAttentionMultiCell(tf.nn.rnn_cell.MultiRNNCell):
+  """A MultiCell with GNMT attention style."""
+
+  def __init__(self, attention_cell, cells):
+    """Creates a GNMTAttentionMultiCell.
+
+    Args:
+      attention_cell: An instance of AttentionWrapper.
+      cells: A list of RNNCell wrapped with AttentionInputWrapper.
+    """
+    cells = [attention_cell] + cells
+    super(GNMTAttentionMultiCell, self).__init__(cells, state_is_tuple=True)
+
+  def __call__(self, inputs, state, scope=None):
+    """Run the cell with bottom layer's attention copied to all upper layers."""
+    if not tf.contrib.framework.nest.is_sequence(state):
+      raise ValueError(
+          "Expected state to be a tuple of length %d, but received: %s"
+          % (len(self.state_size), state))
+
+    with tf.variable_scope(scope or "multi_rnn_cell"):
+      new_states = []
+
+      with tf.variable_scope("cell_0_attention"):
+        attention_cell = self._cells[0]
+        attention_state = state[0]
+        cur_inp, new_attention_state = attention_cell(inputs, attention_state)
+        new_states.append(new_attention_state)
+
+      for i in range(1, len(self._cells)):
+        with tf.variable_scope("cell_%d" % i):
+          cell = self._cells[i]
+          cur_state = state[i]
+
+          cur_inp = tf.concat([cur_inp, new_attention_state.attention], -1)
+          cur_inp, new_state = cell(cur_inp, cur_state)
+          new_states.append(new_state)
+
+    return cur_inp, tuple(new_states)
+
+
+def gnmt_residual_fn(inputs, outputs):
+  """Residual function that handles different inputs and outputs inner dims.
+
+  Args:
+    inputs: cell inputs, this is actual inputs concatenated with the attention
+      vector.
+    outputs: cell outputs
+
+  Returns:
+    outputs + actual inputs
+  """
+  def split_input(inp, out):
+    inp_dim = inp.get_shape().as_list()[-1]
+    out_dim = out.get_shape().as_list()[-1]
+    return tf.split(inp, [out_dim, inp_dim - out_dim], axis=-1)
+  actual_inputs, _ = tf.contrib.framework.nest.map_structure(
+      split_input, inputs, outputs)
+  def assert_shape_match(inp, out):
+    inp.get_shape().assert_is_compatible_with(out.get_shape())
+  tf.contrib.framework.nest.assert_same_structure(actual_inputs, outputs)
+  tf.contrib.framework.nest.map_structure(
+      assert_shape_match, actual_inputs, outputs)
+  return tf.contrib.framework.nest.map_structure(
+      lambda inp, out: inp + out, actual_inputs, outputs)
 
 
 def model_fn(features, labels, mode, params, config):
@@ -3647,15 +3729,15 @@ def model_fn(features, labels, mode, params, config):
 
     protein = features['protein']
     # protein shape=(batch_size, sequence_length), dtype=int32
-    lengths = features['lengths']
-    # lengths shape=(batch_size, ), dtype=int32
+    source_sequence_lengths = features['lengths']
+    # source_sequence_lengths shape=(batch_size, ), dtype=int32
     go = labels['go']
-    # protein shape=(batch_size, sequence_length), dtype=int32
-    go_lengths = labels['go_lengths']
-    # lengths shape=(batch_size, ), dtype=int32
+    # go shape=(batch_size, go_length), dtype=int32
+    target_sequence_lengths = labels['go_lengths']-1
+    # target_sequence_lengths shape=(batch_size, ), dtype=int32
     global_step = tf.train.get_global_step()
     # global_step is assign_add 1 in tf.train.Optimizer.apply_gradients
-    batch_size = tf.shape(lengths)[0]
+    batch_size = tf.shape(source_sequence_lengths)[0]
     # number of sequences per epoch
     seq_total = batch_size
     if mode == tf.estimator.ModeKeys.TRAIN:
@@ -3671,55 +3753,90 @@ def model_fn(features, labels, mode, params, config):
     with tf.name_scope("padding"):
         padding_value = 0
         padding = tf.cast(tf.equal(protein, padding_value), dtype=tf.float32)
-        mask = tf.cast(tf.sign(protein), dtype=tf.float32)  # 0 = 'PAD'
+        protein_mask = tf.cast(tf.sign(protein), dtype=tf.float32)  # 0 = 'PAD'
+        go_mask = tf.cast(tf.sign(go), dtype=tf.float32)  # 0 = 'PAD'
     # mask shape=(batch_size, sequence_length), dtype=float32
     # embedding_dim = 256
     # units = 1024
 
-    vocab_inp_size = len(aa_list)
-    vocab_tar_size = params.num_classes
+    source_vocab_size = len(aa_list)
+    target_vocab_size = params.num_classes
     enc_units = params.rnn_num_units[0]
-    dec_units = params.rnn_num_units[0]
+    # dec_units = params.rnn_num_units[0] # needs to be the same as enc_units
 
-    encoder = Encoder(vocab_inp_size, params.embed_dim, enc_units, batch_size)
-    decoder = Decoder(vocab_tar_size, params.embed_dim, dec_units, batch_size)
+    encoder = Encoder(source_vocab_size, params.embed_dim, enc_units, batch_size)
 
-    enc_hidden = encoder.initialize_hidden_state()
+    encoder_state = encoder.initialize_hidden_state()
 
-    enc_output, enc_hidden = encoder(protein, enc_hidden)
+    enc_output, encoder_state = encoder(protein, encoder_state)
+    # enc_output shape=(batch_size, sequence_length, enc_units), dtype=float32
+    # encoder_state shape=(batch_size, enc_units), dtype=float32
 
-    dec_hidden = enc_hidden
-
-    dec_input = tf.expand_dims([1] * batch_size, 1)
-
-    # loss
+    # decoder = Decoder(target_vocab_size, params.embed_dim, dec_units, batch_size)
+    with tf.variable_scope("decoder") as decoder_scope:
+        target_embedding = tf.keras.layers.Embedding(target_vocab_size, params.target_embed_dim)
+        target_embedded = target_embedding(go[:,:-1])
+        attention_mechanism = attention_wrapper.BahdanauAttention(
+            num_units=params.attention_num_units,
+            memory=enc_output,
+            memory_sequence_length=source_sequence_lengths,
+            normalize=True, dtype=float_type)
+        
+        cell_list = []
+        for i, units in enumerate(params.decoder_num_units):
+            # cell
+            single_cell = tf.contrib.rnn.GRUCell(num_units=units, dtype=float_type)
+            # Dropout (= 1 - keep_prob)
+            if params.decoder_dropout > 0.0:
+                single_cell = tf.contrib.rnn.DropoutWrapper(cell=single_cell, input_keep_prob=(1.0 - params.decoder_dropout))
+            # Residual
+            if i >= len(params.decoder_num_units) - params.decoder_num_residual_layers:
+                single_cell = tf.contrib.rnn.ResidualWrapper(single_cell, residual_fn=gnmt_residual_fn)
+            cell_list.append(single_cell)
+        # Only wrap the bottom layer with the attention mechanism.
+        attention_cell = cell_list.pop(0)
+        attention_cell = attention_wrapper.AttentionWrapper(
+            cell=attention_cell,
+            attention_mechanism=attention_mechanism,
+            attention_layer_size=None,  # don't use attention layer.
+            output_attention=False,
+            alignment_history=False,
+            name="attention")
+        cell = GNMTAttentionMultiCell(attention_cell, cell_list)
+        decoder_initial_state = tuple(
+            zs.clone(cell_state=es)
+            if isinstance(zs, attention_wrapper.AttentionWrapperState) else es
+            for zs, es in zip(
+                cell.zero_state(batch_size, float_type), encoder_state))
+        final_rnn_outputs, _ = tf.nn.dynamic_rnn(
+            cell,
+            target_embedded,
+            sequence_length=target_sequence_lengths,
+            initial_state=decoder_initial_state,
+            dtype=float_type,
+            scope=decoder_scope,
+            parallel_iterations=params.dynamic_rnn_parallel_iterations,
+            time_major=False)
+        output_layer = tf.layers.Dense(
+            units=target_vocab_size, use_bias=False, name="output_projection",
+            dtype=float_type)
+        logits = output_layer(final_rnn_outputs)
 
     if mode != tf.estimator.ModeKeys.PREDICT:
-        loss = 0
-        # Teacher forcing - feeding the target as the next input
-        for t in range(1, go.shape[1]):
-            with tf.variable_scope('decoder'):
-                # passing enc_output to the decoder
-                logits, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
-                # using teacher forcing
-                dec_input = tf.expand_dims(go[:, t], 1)
-            
-            with tf.variable_scope('loss'):
-                losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    labels=go[:, t],
-                    logits=tf.cast(logits, tf.float32)
-                )
-                # losses shape=(batch_size, 1), dtype=float32
-                mask = tf.cast(tf.math.logical_not(tf.math.equal(go[:, t], 0)), dtype=losses.dtype)
-                masked_losses = losses * mask
-                loss += tf.reduce_sum(masked_losses)
-
-        batch_loss = loss / tf.cast(tf.reduce_sum(go_lengths), dtype=tf.float32)
+        with tf.variable_scope('loss'):
+            target_output = go[:,1:]
+            losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=target_output,
+                logits=tf.cast(logits, tf.float32)
+            )
+            # losses shape=(batch_size, target_sequence_lengths), dtype=float32
+            mask = tf.sequence_mask(lengths=target_sequence_lengths,maxlen=tf.shape(target_output)[1],dtype=losses.dtype)
+            masked_losses = losses * mask
+            loss = tf.reduce_sum(masked_losses) / tf.cast(tf.reduce_sum(target_sequence_lengths), dtype=tf.float32)
 
     # predictions
-    #
     with tf.variable_scope('predictions'):
-        all_probs = tf.sigmoid(x=logits, name='sigmoid')
+        all_probs = tf.nn.softmax(logits=logits, axis=-1, name='softmax_tensor')
         # with tf.device('/cpu:0'):
         top_probs, top_classes = tf.nn.top_k(all_probs, params.predict_top_k)
         predictions = {
@@ -3744,26 +3861,39 @@ def model_fn(features, labels, mode, params, config):
         #     predictions['classes'] = decode_tags
         # else:
         #     predictions['classes'] = tf.argmax(input=logits, axis=-1, output_type=tf.int32)
-        # classes = tf.argmax(input=logits, axis=-1, output_type=tf.int32)
-        # predictions['classes'] = classes
+        classes = tf.argmax(input=logits, axis=-1, output_type=tf.int32)
+        predictions['classes'] = classes
 
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions=predictions, # PREDICT
-            export_outputs={ # DEFAULT_SERVING_SIGNATURE_DEF_KEY = "serving_default"
-                tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(predictions)
-            },
-            scaffold=tf.train.Scaffold(saver=tf.train.Saver(
-                sharded=False,
-                max_to_keep=config.keep_checkpoint_max,
-                keep_checkpoint_every_n_hours=(
-                    config.keep_checkpoint_every_n_hours),
-                defer_build=False,
-                save_relative_paths=True)
-            ),
-            prediction_hooks=None
-        )
+
+    # if mode != tf.estimator.ModeKeys.PREDICT:
+    #     # loss
+    #     loss = tf.convert_to_tensor(0, dtype=tf.float32)
+    #     predicted_correct = tf.convert_to_tensor(0, dtype=tf.int32)
+    #     predicted_total = tf.convert_to_tensor(0, dtype=tf.int32)
+    #     # Teacher forcing - feeding the target as the next input
+    #     loss, predicted_correct, predicted_total = decode(go, go_mask, decoder, dec_input, dec_hidden, enc_output, loss, predicted_correct, predicted_total)
+
+    #     batch_loss = loss / tf.cast(tf.reduce_sum(target_sequence_lengths), dtype=tf.float32)
+    #     batch_accuracy = predicted_correct / predicted_total
+    #     tf.summary.scalar('accuracy', batch_accuracy)
+
+    # if mode == tf.estimator.ModeKeys.PREDICT:
+    #     return tf.estimator.EstimatorSpec(
+    #         mode=mode,
+    #         predictions=predictions, # PREDICT
+    #         export_outputs={ # DEFAULT_SERVING_SIGNATURE_DEF_KEY = "serving_default"
+    #             tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(predictions)
+    #         },
+    #         scaffold=tf.train.Scaffold(saver=tf.train.Saver(
+    #             sharded=False,
+    #             max_to_keep=config.keep_checkpoint_max,
+    #             keep_checkpoint_every_n_hours=(
+    #                 config.keep_checkpoint_every_n_hours),
+    #             defer_build=False,
+    #             save_relative_paths=True)
+    #         ),
+    #         prediction_hooks=None
+    #     )
 
     # with tf.variable_scope('evaluation'):
     #     # import tensorflow as tf
@@ -3784,7 +3914,7 @@ def model_fn(features, labels, mode, params, config):
     #         label_rank = tf.reshape(tf.where(tf.equal(tf.contrib.framework.argsort(all_probs, direction='DESCENDING'), tf.expand_dims(labels, -1)))[:,-1], tf.shape(labels))
 
     with tf.variable_scope('metrics'):
-        predicted_labels = tf.round(all_probs)
+        # predicted_labels = tf.round(all_probs)
         metrics = {
             # # true_positives / (true_positives + false_positives)
             # 'precision': tf.metrics.precision(
@@ -3801,43 +3931,51 @@ def model_fn(features, labels, mode, params, config):
             #     name='recall'
             # ),
             # matches / total
-            'accuracy':
-                tf.metrics.accuracy(
-                    labels=labels,
-                    predictions=predicted_labels,
-                    name='accuracy'
-                )
+            # 'accuracy':
+            #     tf.metrics.accuracy(
+            #         labels=labels,
+            #         predictions=predicted_labels,
+            #         name='accuracy'
+            #     )
         }
 
-        with tf.name_scope('batch_accuracy', values=[predicted_labels, labels]):
-            is_correct = tf.cast(tf.equal(predicted_labels, labels), tf.float32)
-            total_values = tf.cast(batch_size * params.num_classes, tf.float32)
-            batch_accuracy = tf.math.divide(
-                tf.reduce_sum(is_correct), total_values
-            )
-            TP = tf.cast(
-                tf.count_nonzero(predicted_labels * labels), tf.float32
-            )
-            FP = tf.cast(
-                tf.count_nonzero(predicted_labels * (labels - 1)), tf.float32
-            )
-            FN = tf.cast(
-                tf.count_nonzero((predicted_labels - 1) * labels), tf.float32
-            )
-            batch_precision = tf.math.divide_no_nan(TP, (TP + FP))
-            batch_recall = tf.math.divide_no_nan(TP, (TP + FN))
-            batch_f1 = tf.math.divide_no_nan(
-                2 * batch_precision * batch_recall,
-                (batch_precision + batch_recall)
-            )
+        with tf.name_scope('batch_accuracy', values=[predictions['classes'], target_output]):
+            is_correct = tf.cast(
+                tf.equal(predictions['classes'], target_output), tf.float32)
+            is_correct = tf.multiply(is_correct, mask)
+            batch_accuracy = tf.math.divide(tf.reduce_sum(
+                is_correct), tf.reduce_sum(mask))
         tf.summary.scalar('accuracy', batch_accuracy)
-        tf.summary.scalar('precision', batch_precision)
-        tf.summary.scalar('recall', batch_recall)
-        tf.summary.scalar('f1', batch_f1)
-        # tf.summary.scalar('accuracy', metrics['accuracy'][0])
-        # currently only works for bool
-        # tf.summary.scalar('precision', metrics['precision'][1])
-        # tf.summary.scalar('recall', metrics['recall'][1])
+
+        # with tf.name_scope('batch_accuracy', values=[predicted_labels, labels]):
+        #     is_correct = tf.cast(tf.equal(predicted_labels, labels), tf.float32)
+        #     total_values = tf.cast(batch_size * params.num_classes, tf.float32)
+        #     batch_accuracy = tf.math.divide(
+        #         tf.reduce_sum(is_correct), total_values
+        #     )
+        #     TP = tf.cast(
+        #         tf.count_nonzero(predicted_labels * labels), tf.float32
+        #     )
+        #     FP = tf.cast(
+        #         tf.count_nonzero(predicted_labels * (labels - 1)), tf.float32
+        #     )
+        #     FN = tf.cast(
+        #         tf.count_nonzero((predicted_labels - 1) * labels), tf.float32
+        #     )
+        #     batch_precision = tf.math.divide_no_nan(TP, (TP + FP))
+        #     batch_recall = tf.math.divide_no_nan(TP, (TP + FN))
+        #     batch_f1 = tf.math.divide_no_nan(
+        #         2 * batch_precision * batch_recall,
+        #         (batch_precision + batch_recall)
+        #     )
+        # tf.summary.scalar('accuracy', batch_accuracy)
+        # tf.summary.scalar('precision', batch_precision)
+        # tf.summary.scalar('recall', batch_recall)
+        # tf.summary.scalar('f1', batch_f1)
+        # # tf.summary.scalar('accuracy', metrics['accuracy'][0])
+        # # currently only works for bool
+        # # tf.summary.scalar('precision', metrics['precision'][1])
+        # # tf.summary.scalar('recall', metrics['recall'][1])
 
     # optimizer list
     optimizers = {
@@ -4008,7 +4146,7 @@ def model_fn(features, labels, mode, params, config):
             true_fn=lambda: tf.Print(
                 train_op,
                 # data=[global_step, metrics['accuracy'][0], lengths, loss, losses, predictions['classes'], labels, mask, protein, embeddings],
-                data=[global_step, batch_accuracy, lengths, batch_loss, embeddings],
+                data=[global_step, batch_accuracy, source_sequence_lengths, batch_loss, embeddings],
                 message='## DEBUG LOSS: ',
                 summarize=50000
             )
@@ -4148,9 +4286,9 @@ def model_fn(features, labels, mode, params, config):
 
     evaluation_hooks = []
     eval_tensors = {
-        'lengths': lengths,
+        'lengths': source_sequence_lengths,
         'protein': protein,
-        'labels': labels,
+        'go': go,
     }
     # if params.eval_level == 'topk':
     #     eval_tensors['label_prob'] = label_prob
@@ -4193,6 +4331,49 @@ def model_fn(features, labels, mode, params, config):
         evaluation_hooks=evaluation_hooks,
         prediction_hooks=None
     )
+
+# @tf.function
+# def decode(go, go_mask, decoder, dec_input, dec_hidden, enc_output, loss, predicted_correct, predicted_total):
+#     # Teacher forcing - feeding the target as the next input
+#     # loss=tf.cast(loss, tf.float32)
+#     print('go.shape', tf.shape(go))
+#     for t in range(1, tf.shape(go)[1]):
+#         labels = go[:, t]
+#         mask = go_mask[:, t]
+#         with tf.variable_scope('decoder'):
+#             # passing enc_output to the decoder
+#             logits, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
+#             # logits shape=(batch_size, target_vocab_size), dtype=float32
+#             # dec_hidden shape=(batch_size, dec_units), dtype=float32
+#             # using teacher forcing
+#             dec_input = tf.expand_dims(labels, 1)
+#             # go[:, t] shape=(batch_size, ), dtype=float32
+#             # dec_input shape=(batch_size, 1), dtype=float32
+
+
+#         with tf.variable_scope('loss'):
+#             losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
+#                 labels=labels,
+#                 logits=tf.cast(logits, tf.float32)
+#             )
+#             # losses shape=(batch_size, 1), dtype=float32
+#             masked_losses = losses * mask
+#             loss += tf.reduce_sum(masked_losses)
+
+#         with tf.variable_scope('predictions'):
+#             all_probs = tf.nn.softmax(logits=logits, axis=-1, name='softmax_tensor')
+#             # all_probs shape=(batch_size, target_vocab_size), dtype=float32
+#             # top_probs, top_classes = tf.nn.top_k(all_probs, params.predict_top_k)
+#             # top_probs shape=(batch_size, predict_top_k), dtype=float32
+#             # top_classes shape=(batch_size, predict_top_k), dtype=float32
+#             classes = tf.argmax(input=logits, axis=-1, output_type=tf.int32)
+#             # classes shape=(batch_size, ), dtype=float32
+
+#         with tf.variable_scope('metrics'):
+#             is_correct = tf.multiply(tf.cast(tf.equal(classes, labels), tf.float32), mask)
+#             predicted_correct += tf.cast(tf.reduce_sum(is_correct), tf.int32)
+#             predicted_total += tf.cast(tf.reduce_sum(mask), tf.int32)
+#     return loss, predicted_correct, predicted_total
 
 
 # https://github.com/tensorflow/models/blob/69cf6fca2106c41946a3c395126bdd6994d36e6b/tutorials/rnn/quickdraw/train_model.py
@@ -4505,6 +4686,8 @@ def main(unused_args):
     session_config.graph_options.rewrite_options.meta_optimizer_iterations = rewriter_config_pb2.RewriterConfig.ONE  # pylint: disable=no-member
     if FLAGS.use_jit_xla:
         session_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1  # pylint: disable=no-member
+    if FLAGS.gpu_allow_growth:
+        session_config.gpu_options.allow_growth=True
 
     estimator, train_spec, eval_spec = create_estimator_and_specs(
         run_config=tf.estimator.RunConfig(
@@ -4870,14 +5053,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '--experiment_name',
         type=str,
-        default='Exp',
+        default='PARSE',
         help=
         'Experiment name for logging purposes, if "PARSE", split model_dir by "_" and use the first part as the experiment name'
     )
     parser.add_argument(
         '--host_script_name',
         type=str,
-        default='tensorflow',
+        default='PARSE',
         help=
         'Host script name for logging purposes (8086K1-1.2), if "PARSE", split model_dir by "_" and use the last part as the host script name'
     )
@@ -5010,6 +5193,12 @@ if __name__ == '__main__':
         help='Whether to enable JIT XLA.'
     )
     parser.add_argument(
+        '--gpu_allow_growth',
+        type='bool',
+        default='False',
+        help='Prevent tensorflow from allocating the totality of a GPU memory.'
+    )
+    parser.add_argument(
         '--use_tensor_ops',
         type='bool',
         default='False',
@@ -5030,7 +5219,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save_checkpoints_secs',
         type=int,
-        default=10 * 60,
+        default=3600,
         help='Save checkpoints every this many seconds.'
     )
     parser.add_argument(
@@ -5048,7 +5237,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--log_step_count_steps',
         type=int,
-        default=100,
+        default=20,
         help=
         'The frequency, in number of global steps, that the global step/sec will be logged during training.'
     )
