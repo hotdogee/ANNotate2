@@ -310,12 +310,12 @@ def _bahdanau_score(processed_query, keys, normalize, v, g, b):
       y = tf.reshape(y, [batch, max_time])
       return y
 
-    use_xla = os.environ["use_xla"] == "true"
+    use_xla = os.environ.get("use_xla") == "true"
     def NormalizedAtten(keys, processed_query, g, v, b):
       return NormalizedAttenFwd(keys, processed_query, g, v, b)
 
     fn = NormalizedAtten
-    if os.environ["use_defun"] == "true":
+    if os.environ.get("use_defun") == "true":
       fn = function.Defun(compiled=use_xla)(fn)
     res = fn(keys, processed_query, g, v, b)
     res.set_shape((None, keys.shape[1]))
@@ -335,7 +335,7 @@ def _bahdanau_score(processed_query, keys, normalize, v, g, b):
       y = tf.reshape(y, [batch, max_time])
       return y
     fn = _Atten
-    if os.environ["use_defun"] == "true":
+    if os.environ.get("use_defun") == "true":
       fn = function.Defun()(fn)
     return fn(keys, processed_query, v)
 

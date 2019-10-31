@@ -3607,98 +3607,53 @@ class BahdanauAttention(tf.keras.layers.Layer):
         return context_vector, attention_weights
 
 
-class Decoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
-        super(Decoder, self).__init__()
-        self.batch_sz = batch_sz
-        self.dec_units = dec_units
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = tf.keras.layers.GRU(
-            self.dec_units,
-            return_sequences=True,
-            return_state=True,
-            recurrent_initializer='glorot_uniform'
-        )
-        self.fc = tf.keras.layers.Dense(vocab_size)
-
-        # used for attention
-        self.attention = BahdanauAttention(self.dec_units)
-
-    def call(self, x, hidden, enc_output):
-        # x shape=(batch_size, 1), dtype=float32
-        # hidden shape=(batch_size, enc_units), dtype=float32
-        # enc_output shape=(batch_size, sequence_length, enc_units), dtype=float32
-        context_vector, attention_weights = self.attention(hidden, enc_output)
-        # context_vector shape=(batch_size, enc_units), dtype=float32
-        # attention_weights shape=(batch_size, max_length, 1), dtype=float32
-
-        # x shape after passing through embedding == (batch_size, 1, embedding_dim)
-        x = self.embedding(x)
-        # x shape=(batch_size, 1, embedding_dim), dtype=float32
-
-        # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
-        x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
-        # x shape=(batch_size, 1, embedding_dim + enc_units), dtype=float32
-
-        # passing the concatenated vector to the GRU
-        output, state = self.gru(x)
-        # output shape=(batch_size, 1, dec_units), dtype=float32
-        # state shape=(batch_size, dec_units), dtype=float32
-
-        # output shape == (batch_size * 1, dec_units)
-        output = tf.reshape(output, (-1, output.shape[2]))
-        # output shape=(batch_size, dec_units), dtype=float32
-
-        # output shape == (batch_size, vocab)
-        x = self.fc(output)
-        # output shape=(batch_size, target_vocab_size), dtype=float32
-
-        return x, state, attention_weights
-
-
 class GNMTAttentionMultiCell(tf.nn.rnn_cell.MultiRNNCell):
-  """A MultiCell with GNMT attention style."""
-
-  def __init__(self, attention_cell, cells):
-    """Creates a GNMTAttentionMultiCell.
+    """A MultiCell with GNMT attention style."""
+    def __init__(self, attention_cell, cells):
+        """Creates a GNMTAttentionMultiCell.
 
     Args:
       attention_cell: An instance of AttentionWrapper.
       cells: A list of RNNCell wrapped with AttentionInputWrapper.
     """
-    cells = [attention_cell] + cells
-    super(GNMTAttentionMultiCell, self).__init__(cells, state_is_tuple=True)
+        cells = [attention_cell] + cells
+        super(GNMTAttentionMultiCell, self).__init__(cells, state_is_tuple=True)
 
-  def __call__(self, inputs, state, scope=None):
-    """Run the cell with bottom layer's attention copied to all upper layers."""
-    if not tf.contrib.framework.nest.is_sequence(state):
-      raise ValueError(
-          "Expected state to be a tuple of length %d, but received: %s"
-          % (len(self.state_size), state))
+    def __call__(self, inputs, state, scope=None):
+        """Run the cell with bottom layer's attention copied to all upper layers."""
+        if not tf.contrib.framework.nest.is_sequence(state):
+            raise ValueError(
+                "Expected state to be a tuple of length %d, but received: %s" %
+                (len(self.state_size), state)
+            )
 
-    with tf.variable_scope(scope or "multi_rnn_cell"):
-      new_states = []
+        with tf.variable_scope(scope or "multi_rnn_cell"):
+            new_states = []
 
-      with tf.variable_scope("cell_0_attention"):
-        attention_cell = self._cells[0]
-        attention_state = state[0]
-        cur_inp, new_attention_state = attention_cell(inputs, attention_state)
-        new_states.append(new_attention_state)
+            with tf.variable_scope("cell_0_attention"):
+                attention_cell = self._cells[0]
+                attention_state = state[0]
+                cur_inp, new_attention_state = attention_cell(
+                    inputs, attention_state
+                )
+                new_states.append(new_attention_state)
 
-      for i in range(1, len(self._cells)):
-        with tf.variable_scope("cell_%d" % i):
-          cell = self._cells[i]
-          cur_state = state[i]
+            for i in range(1, len(self._cells)):
+                with tf.variable_scope("cell_%d" % i):
+                    cell = self._cells[i]
+                    cur_state = state[i]
 
-          cur_inp = tf.concat([cur_inp, new_attention_state.attention], -1)
-          cur_inp, new_state = cell(cur_inp, cur_state)
-          new_states.append(new_state)
+                    cur_inp = tf.concat(
+                        [cur_inp, new_attention_state.attention], -1
+                    )
+                    cur_inp, new_state = cell(cur_inp, cur_state)
+                    new_states.append(new_state)
 
-    return cur_inp, tuple(new_states)
+        return cur_inp, tuple(new_states)
 
 
 def gnmt_residual_fn(inputs, outputs):
-  """Residual function that handles different inputs and outputs inner dims.
+    """Residual function that handles different inputs and outputs inner dims.
 
   Args:
     inputs: cell inputs, this is actual inputs concatenated with the attention
@@ -3708,19 +3663,250 @@ def gnmt_residual_fn(inputs, outputs):
   Returns:
     outputs + actual inputs
   """
-  def split_input(inp, out):
-    inp_dim = inp.get_shape().as_list()[-1]
-    out_dim = out.get_shape().as_list()[-1]
-    return tf.split(inp, [out_dim, inp_dim - out_dim], axis=-1)
-  actual_inputs, _ = tf.contrib.framework.nest.map_structure(
-      split_input, inputs, outputs)
-  def assert_shape_match(inp, out):
-    inp.get_shape().assert_is_compatible_with(out.get_shape())
-  tf.contrib.framework.nest.assert_same_structure(actual_inputs, outputs)
-  tf.contrib.framework.nest.map_structure(
-      assert_shape_match, actual_inputs, outputs)
-  return tf.contrib.framework.nest.map_structure(
-      lambda inp, out: inp + out, actual_inputs, outputs)
+    def split_input(inp, out):
+        inp_dim = inp.get_shape().as_list()[-1]
+        out_dim = out.get_shape().as_list()[-1]
+        return tf.split(inp, [out_dim, inp_dim - out_dim], axis=-1)
+
+    actual_inputs, _ = tf.contrib.framework.nest.map_structure(
+        split_input, inputs, outputs
+    )
+
+    def assert_shape_match(inp, out):
+        inp.get_shape().assert_is_compatible_with(out.get_shape())
+
+    tf.contrib.framework.nest.assert_same_structure(actual_inputs, outputs)
+    tf.contrib.framework.nest.map_structure(
+        assert_shape_match, actual_inputs, outputs
+    )
+    return tf.contrib.framework.nest.map_structure(
+        lambda inp, out: inp + out, actual_inputs, outputs
+    )
+
+
+# Transformer model
+class TransformerDecoder(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        num_layers,
+        d_model,
+        num_heads,
+        dff,
+        target_vocab_size,
+        maximum_position_encoding,
+        rate=0.1
+    ):
+        super(TransformerDecoder, self).__init__()
+
+        self.d_model = d_model
+        self.num_layers = num_layers
+
+        self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
+        self.pos_encoding = positional_encoding(
+            maximum_position_encoding, d_model
+        )
+
+        self.dec_layers = [
+            DecoderLayer(d_model, num_heads, dff, rate)
+            for _ in range(num_layers)
+        ]
+        self.dropout = tf.keras.layers.Dropout(rate)
+
+    def call(self, inputs, enc_output, training, look_ahead_mask, padding_mask):
+
+        seq_len = tf.shape(inputs)[1]
+        attention_weights = {}
+
+        inputs = self.embedding(inputs)  # (batch_size, target_seq_len, d_model)
+        inputs *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
+        inputs += self.pos_encoding[:, :seq_len, :]
+        inputs = self.dropout(inputs, training=training)
+
+        for i in range(self.num_layers):
+            inputs, block1, block2 = self.dec_layers[i](
+                inputs, enc_output, training, look_ahead_mask, padding_mask
+            )
+
+            attention_weights['decoder_layer{}_block1'.format(i + 1)] = block1
+            attention_weights['decoder_layer{}_block2'.format(i + 1)] = block2
+
+        # inputs.shape == (batch_size, target_seq_len, d_model)
+        return inputs, attention_weights
+
+
+def get_angles(pos, i, d_model):
+    angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
+    return pos * angle_rates
+
+
+def positional_encoding(position, d_model):
+    angle_rads = get_angles(
+        np.arange(position)[:, np.newaxis],
+        np.arange(d_model)[np.newaxis, :], d_model
+    )
+
+    # apply sin to even indices in the array; 2i
+    angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])
+
+    # apply cos to odd indices in the array; 2i+1
+    angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])
+
+    pos_encoding = angle_rads[np.newaxis, ...]
+
+    return tf.cast(pos_encoding, dtype=tf.float32)
+
+
+class DecoderLayer(tf.keras.layers.Layer):
+    def __init__(self, d_model, num_heads, dff, rate=0.1):
+        super(DecoderLayer, self).__init__()
+
+        self.mha1 = MultiHeadAttention(d_model, num_heads)
+        self.mha2 = MultiHeadAttention(d_model, num_heads)
+
+        self.ffn = point_wise_feed_forward_network(d_model, dff)
+
+        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm3 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
+        self.dropout3 = tf.keras.layers.Dropout(rate)
+
+    def call(self, inputs, enc_output, training, look_ahead_mask, padding_mask):
+        # enc_output.shape == (batch_size, input_seq_len, d_model)
+
+        attn1, attn_weights_block1 = self.mha1(
+            inputs, inputs, inputs, look_ahead_mask
+        )  # (batch_size, target_seq_len, d_model)
+        attn1 = self.dropout1(attn1, training=training)
+        out1 = self.layernorm1(attn1 + inputs)
+
+        attn2, attn_weights_block2 = self.mha2(
+            enc_output, enc_output, out1, padding_mask
+        )  # (batch_size, target_seq_len, d_model)
+        attn2 = self.dropout2(attn2, training=training)
+        out2 = self.layernorm2(
+            attn2 + out1
+        )  # (batch_size, target_seq_len, d_model)
+
+        ffn_output = self.ffn(out2)  # (batch_size, target_seq_len, d_model)
+        ffn_output = self.dropout3(ffn_output, training=training)
+        out3 = self.layernorm3(
+            ffn_output + out2
+        )  # (batch_size, target_seq_len, d_model)
+
+        return out3, attn_weights_block1, attn_weights_block2
+
+
+def point_wise_feed_forward_network(d_model, dff):
+    return tf.keras.Sequential(
+        [
+            tf.keras.layers.Dense(dff, activation='relu'
+                                 ),  # (batch_size, seq_len, dff)
+            tf.keras.layers.Dense(d_model)  # (batch_size, seq_len, d_model)
+        ]
+    )
+
+
+class MultiHeadAttention(tf.keras.layers.Layer):
+    def __init__(self, d_model, num_heads):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+
+        assert d_model % self.num_heads == 0
+
+        self.depth = d_model // self.num_heads
+
+        self.wq = tf.keras.layers.Dense(d_model)
+        self.wk = tf.keras.layers.Dense(d_model)
+        self.wv = tf.keras.layers.Dense(d_model)
+
+        self.dense = tf.keras.layers.Dense(d_model)
+
+    def split_heads(self, x, batch_size):
+        """Split the last dimension into (num_heads, depth).
+    Transpose the result such that the shape is (batch_size, num_heads, seq_len, depth)
+    """
+        x = tf.reshape(x, (batch_size, -1, self.num_heads, self.depth))
+        return tf.transpose(x, perm=[0, 2, 1, 3])
+
+    def call(self, v, k, q, mask):
+        batch_size = tf.shape(q)[0]
+
+        q = self.wq(q)  # (batch_size, seq_len, d_model)
+        k = self.wk(k)  # (batch_size, seq_len, d_model)
+        v = self.wv(v)  # (batch_size, seq_len, d_model)
+
+        q = self.split_heads(
+            q, batch_size
+        )  # (batch_size, num_heads, seq_len_q, depth)
+        k = self.split_heads(
+            k, batch_size
+        )  # (batch_size, num_heads, seq_len_k, depth)
+        v = self.split_heads(
+            v, batch_size
+        )  # (batch_size, num_heads, seq_len_v, depth)
+
+        # scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
+        # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
+        scaled_attention, attention_weights = scaled_dot_product_attention(
+            q, k, v, mask
+        )
+
+        scaled_attention = tf.transpose(
+            scaled_attention, perm=[0, 2, 1, 3]
+        )  # (batch_size, seq_len_q, num_heads, depth)
+
+        concat_attention = tf.reshape(
+            scaled_attention, (batch_size, -1, self.d_model)
+        )  # (batch_size, seq_len_q, d_model)
+
+        output = self.dense(
+            concat_attention
+        )  # (batch_size, seq_len_q, d_model)
+
+        return output, attention_weights
+
+
+def scaled_dot_product_attention(q, k, v, mask):
+    """Calculate the attention weights.
+    q, k, v must have matching leading dimensions.
+    k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
+    The mask has different shapes depending on its type(padding or look ahead) 
+    but it must be broadcastable for addition.
+    
+    Args:
+        q: query shape == (..., seq_len_q, depth)
+        k: key shape == (..., seq_len_k, depth)
+        v: value shape == (..., seq_len_v, depth_v)
+        mask: Float tensor with shape broadcastable 
+            to (..., seq_len_q, seq_len_k). Defaults to None.
+        
+    Returns:
+        output, attention_weights
+    """
+
+    matmul_qk = tf.matmul(q, k, transpose_b=True)  # (..., seq_len_q, seq_len_k)
+
+    # scale matmul_qk
+    dk = tf.cast(tf.shape(k)[-1], tf.float32)
+    scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
+
+    # add the mask to the scaled tensor.
+    if mask is not None:
+        scaled_attention_logits += (mask * -1e9)
+
+    # softmax is normalized on the last axis (seq_len_k) so that the scores
+    # add up to 1.
+    attention_weights = tf.nn.softmax(
+        scaled_attention_logits, axis=-1
+    )  # (..., seq_len_q, seq_len_k)
+
+    output = tf.matmul(attention_weights, v)  # (..., seq_len_q, depth_v)
+
+    return output, attention_weights
 
 
 def model_fn(features, labels, mode, params, config):
@@ -3733,7 +3919,8 @@ def model_fn(features, labels, mode, params, config):
     # source_sequence_lengths shape=(batch_size, ), dtype=int32
     go = labels['go']
     # go shape=(batch_size, go_length), dtype=int32
-    target_sequence_lengths = labels['go_lengths']-1
+    target_sequence_lengths = labels['go_lengths']
+    target_output_lengths = target_sequence_lengths - 1
     # target_sequence_lengths shape=(batch_size, ), dtype=int32
     global_step = tf.train.get_global_step()
     # global_step is assign_add 1 in tf.train.Optimizer.apply_gradients
@@ -3752,7 +3939,6 @@ def model_fn(features, labels, mode, params, config):
 
     with tf.name_scope("padding"):
         padding_value = 0
-        padding = tf.cast(tf.equal(protein, padding_value), dtype=tf.float32)
         protein_mask = tf.cast(tf.sign(protein), dtype=tf.float32)  # 0 = 'PAD'
         go_mask = tf.cast(tf.sign(go), dtype=tf.float32)  # 0 = 'PAD'
     # mask shape=(batch_size, sequence_length), dtype=float32
@@ -3760,83 +3946,366 @@ def model_fn(features, labels, mode, params, config):
     # units = 1024
 
     source_vocab_size = len(aa_list)
-    target_vocab_size = params.num_classes
+    with tf.variable_scope("encoder"):
+        # Embedding layer
+        with tf.variable_scope('embedding', values=[features]):
+            embeddings = tf.contrib.framework.model_variable(
+                name='embeddings',
+                # params.encoder_embed_dim = 32
+                shape=[source_vocab_size, params.encoder_embed_dim],
+                dtype=float_type,  # default: tf.float32
+                # initializer=None, # default: tf.glorot_uniform_initializer(seed=None, dtype=tf.float32)
+                initializer=tf.random_uniform_initializer(
+                    minval=-0.5, maxval=0.5, dtype=float_type
+                ),
+                trainable=True,
+            )  # vocab_size * embed_dim = 28 * 32 = 896
+            # tf.Variable 'embedding_matrix:0' shape=(vocab_size, embed_dim) dtype=float32
+            embedded = tf.nn.embedding_lookup(
+                params=embeddings, ids=protein, name='embedding_lookup'
+            )
+            # tf.Tensor: shape=(batch_size, sequence_length, embed_dim), dtype=float32
+            dropped_embedded = tf.layers.dropout(
+                inputs=embedded,
+                rate=params.embedded_dropout,  # 0.2
+                # noise_shape=None, # [batch_size, 1, embed_dim]
+                noise_shape=[batch_size, 1,
+                             params.encoder_embed_dim],  # drop embedding
+                # noise_shape=[params.batch_size, tf.shape(embedded)[1], 1], # drop word
+                training=is_train,
+                name='dropout'
+            )
 
-    encoder = Encoder(source_vocab_size, params.encoder_embed_dim, params.encoder_num_units[0], batch_size)
+        # temporal convolution
+        with tf.variable_scope('temporal_convolution'):
+            with tf.variable_scope('convolution_bank'):
+                conv_fn = lambda k: \
+                    tf.layers.conv1d(
+                        inputs=dropped_embedded,
+                        filters=params.conv_filters,  # 32
+                        kernel_size=(k-1)*2+1,
+                        strides=params.conv_strides,  # 1
+                        padding='same',
+                        data_format='channels_last',
+                        dilation_rate=1,
+                        activation=None,  # relu6, default: linear
+                        use_bias=False,
+                        # kernel_initializer=None, # default: tf.glorot_uniform_initializer(seed=None, dtype=tf.float32)
+                        kernel_initializer=tf.glorot_uniform_initializer(
+                            seed=None, dtype=float_type),
+                        bias_initializer=tf.zeros_initializer(dtype=float_type),
+                        trainable=True,
+                        name='conv1d_{}'.format(k),
+                        reuse=None
+                    )  # (kernel_size * embed_dim + use_bias) * filters = (7 * 32 + 1) * 32 = 7200
+                # weights = [(kernel_size, embed_dim, filters), (filters)]
+                # params.conv_bank_size = 15
+                convolved = tf.concat(
+                    [conv_fn(k) for k in range(1, params.conv_bank_size + 1)],
+                    axis=-1
+                )
+                # convolved.shape[2] = 32 * 15 = 480
+                # tf.Tensor: shape=(batch_size, sequence_length, conv_filters * conv_bank_size), dtype=float32
+                # EXPLORE
+                # >>> import tensorflow as tf
+                # >>> tf.enable_eager_execution()
+                # >>> batch, length, depth = (2, 6, 3)
+                # >>> x = tf.random_uniform([batch, length, depth])
+            with tf.variable_scope('batch_norm'):
+                convolved = tf.contrib.layers.batch_norm(
+                    inputs=convolved,
+                    decay=0.99,
+                    center=True,
+                    scale=False,
+                    epsilon=0.001,
+                    activation_fn=None,
+                    param_initializers=None,
+                    param_regularizers=None,
+                    updates_collections=tf.GraphKeys.UPDATE_OPS,
+                    is_training=is_train,
+                    reuse=None,
+                    variables_collections=None,
+                    outputs_collections=None,
+                    trainable=True,
+                    batch_weights=None,
+                    fused=True,
+                    data_format='NHWC',
+                    zero_debias_moving_mean=False,
+                    scope=None,
+                    renorm=params.use_batch_renorm,  # False
+                    renorm_clipping=None,
+                    renorm_decay=0.99,
+                    adjustment=None
+                )
+            convolved = tf.nn.relu(convolved, name='relu')
+            convolved = tf.layers.dropout(
+                inputs=convolved,
+                rate=params.conv_dropout,  # 0.2
+                noise_shape=None,  # [batch_size, 1, embed_dim]
+                training=is_train,
+                name='dropout'
+            )
 
-    encoder_state = encoder.initialize_hidden_state()
+            # Residual connection
+            with tf.variable_scope('residual'):
+                convolved = tf.concat(
+                    values=[convolved, dropped_embedded], axis=-1
+                )
+                # convolved.shape[2] = 480 + 32 = 512
 
-    enc_output, encoder_state = encoder(protein, encoder_state)
-    # enc_output shape=(batch_size, sequence_length, enc_units), dtype=float32
-    # encoder_state shape=(batch_size, enc_units), dtype=float32
+            # Highway network
+            with tf.variable_scope('highway'):
+                # Handle dimensionality mismatch:
+                if convolved.shape[2] != params.conv_highway_units:  # 512
+                    convolved = tf.layers.dense(
+                        convolved, params.conv_highway_units
+                    )
+                for d in range(params.conv_highway_depth):  # 3
+                    with tf.variable_scope('highway_{}'.format(d)):
+                        H = tf.layers.dense(
+                            inputs=convolved,
+                            units=params.conv_highway_units,  # 512
+                            activation=tf.nn.relu,
+                            use_bias=True,
+                            kernel_initializer=None,
+                            bias_initializer=tf.zeros_initializer(),
+                            kernel_regularizer=None,
+                            bias_regularizer=None,
+                            activity_regularizer=None,
+                            kernel_constraint=None,
+                            bias_constraint=None,
+                            trainable=True,
+                            name='H',
+                            reuse=None
+                        )
+                        T = tf.layers.dense(
+                            inputs=convolved,
+                            units=params.conv_highway_units,
+                            activation=tf.nn.sigmoid,
+                            use_bias=True,
+                            kernel_initializer=None,
+                            bias_initializer=tf.constant_initializer(-1.0),
+                            kernel_regularizer=None,
+                            bias_regularizer=None,
+                            activity_regularizer=None,
+                            kernel_constraint=None,
+                            bias_constraint=None,
+                            trainable=True,
+                            name='T',
+                            reuse=None
+                        )
+                        # convolved = tf.Print(convolved,
+                        #     data=[tf.shape(convolved), tf.shape(H), tf.shape(T)],
+                        #     message='## DEBUG Highway: ',
+                        #     summarize=500
+                        #     ) # [128 512 16][128 512 32][128 512 32]
+                        convolved = H * T + convolved * (1.0 - T)
+
+        # bidirectional gru
+        with tf.variable_scope('bidirectional_rnn'):
+            with tf.variable_scope('CudnnGRU'):
+                rnn_float_type = float_type
+                transposed_convolved = tf.transpose(
+                    convolved, [1, 0, 2], name='to_time_major'
+                )
+                lstm = tf.contrib.cudnn_rnn.CudnnGRU(
+                    num_layers=len(params.encoder_num_units),
+                    num_units=params.encoder_num_units[0],
+                    input_mode=
+                    'linear_input',  # can be 'linear_input', 'skip_input' or 'auto_select'
+                    direction=
+                    "bidirectional",  # Can be either 'unidirectional' or 'bidirectional'
+                    dropout=params.encoder_dropout,
+                    seed=0,
+                    dtype=rnn_float_type,
+                    kernel_initializer=None,
+                    bias_initializer=None,  # default is all zeros
+                    name='CudnnGRU1'
+                )
+                # call(self, inputs, initial_state=None, training=True)
+                outputs, output_h = lstm(
+                    tf.cast(transposed_convolved, rnn_float_type)
+                )
+                # Convert back from time-major outputs to batch-major outputs.
+                encoder_output = tf.transpose(
+                    outputs, [1, 0, 2], name='transpose_from_rnn'
+                )
+                # outputs = tf.Print(outputs,
+                #     data=[outputs, dropped_convolved,
+                #         tf.shape(outputs), tf.shape(dropped_convolved)],
+                #     message='## DEBUG RNN: ',
+                #     summarize=500
+                #     ) # [64 1016 256][64 1016 32]
+            with tf.variable_scope('batch_norm'):
+                if params.use_rnn_batch_norm:  # True
+                    encoder_output = tf.contrib.layers.batch_norm(
+                        inputs=encoder_output,
+                        decay=0.99,
+                        center=True,
+                        scale=False,
+                        epsilon=0.001,
+                        activation_fn=None,
+                        param_initializers=None,
+                        param_regularizers=None,
+                        updates_collections=tf.GraphKeys.UPDATE_OPS,
+                        is_training=is_train,
+                        reuse=None,
+                        variables_collections=None,
+                        outputs_collections=None,
+                        trainable=True,
+                        batch_weights=None,
+                        fused=True,
+                        data_format='NHWC',
+                        zero_debias_moving_mean=False,
+                        scope=None,
+                        renorm=params.use_batch_renorm,  # False
+                        renorm_clipping=None,
+                        renorm_decay=0.99,
+                        adjustment=None
+                    )
+
+        # encoder = Encoder(
+        #     source_vocab_size, params.encoder_embed_dim,
+        #     params.encoder_num_units[0], batch_size
+        # )
+        # encoder_state = encoder.initialize_hidden_state()
+        # encoder_output, encoder_state = encoder(protein, encoder_state)
+        # encoder_output shape=(batch_size, sequence_length, enc_units), dtype=float32
+        # encoder_state shape=(batch_size, enc_units), dtype=float32
 
     # decoder = Decoder(target_vocab_size, params.decoder_embed_dim, dec_units, batch_size)
+    target_vocab_size = params.num_classes
     with tf.variable_scope("decoder") as decoder_scope:
-        decoder_embedding = tf.keras.layers.Embedding(target_vocab_size, params.decoder_embed_dim) # 1024
-        target_embedded = decoder_embedding(go[:,:-1])
-        attention_mechanism = attention_wrapper.BahdanauAttention(
-            num_units=params.attention_num_units, # 1024
-            memory=enc_output,
-            memory_sequence_length=source_sequence_lengths,
-            normalize=True, dtype=float_type)
+        target_input = go[:, :-1]
+        source_padding = tf.cast(
+            tf.equal(protein, padding_value), dtype=tf.float32
+        )
+        target_input_padding = tf.cast(
+            tf.equal(target_input, padding_value), dtype=tf.float32
+        )
 
-        cell_list = []
-        for i, units in enumerate(params.decoder_num_units): # [256,256,256,256]
-            # cell
-            single_cell = tf.contrib.rnn.GRUCell(num_units=units, dtype=float_type)
-            # Dropout (= 1 - keep_prob)
-            if params.decoder_dropout > 0.0: # 0.0
-                single_cell = tf.contrib.rnn.DropoutWrapper(cell=single_cell, input_keep_prob=(1.0 - params.decoder_dropout))
-            # Residual
-            if i >= len(params.decoder_num_units) - params.decoder_num_residual_layers: # 2
-                single_cell = tf.contrib.rnn.ResidualWrapper(single_cell, residual_fn=gnmt_residual_fn)
-            cell_list.append(single_cell)
-        # Only wrap the bottom layer with the attention mechanism.
-        attention_cell = cell_list.pop(0)
-        attention_cell = attention_wrapper.AttentionWrapper(
-            cell=attention_cell,
-            attention_mechanism=attention_mechanism,
-            attention_layer_size=None,  # don't use attention layer.
-            output_attention=False,
-            alignment_history=False,
-            name="attention")
-        cell = GNMTAttentionMultiCell(attention_cell, cell_list)
-        decoder_initial_state = tuple(
-            zs.clone(cell_state=es)
-            if isinstance(zs, attention_wrapper.AttentionWrapperState) else es
-            for zs, es in zip(
-                cell.zero_state(batch_size, float_type), encoder_state))
-        final_rnn_outputs, _ = tf.nn.dynamic_rnn(
-            cell,
-            target_embedded,
-            sequence_length=target_sequence_lengths,
-            initial_state=decoder_initial_state,
-            dtype=float_type,
-            scope=decoder_scope,
-            parallel_iterations=params.dynamic_rnn_parallel_iterations, # 32
-            time_major=False)
+        if params.decoder_type == 'transformer':
+            decoder = TransformerDecoder(
+                num_layers=params.transformer_num_layers,
+                d_model=params.transformer_d_model,
+                num_heads=params.transformer_num_heads,
+                dff=params.transformer_dff,
+                target_vocab_size=target_vocab_size,
+                maximum_position_encoding=params.transformer_pe_target,
+                rate=params.transformer_dropout_rate
+            )
+            look_ahead_mask = tf.maximum(
+                target_input_padding[:, tf.newaxis, tf.newaxis, :],
+                1 - tf.linalg.band_part(
+                    tf.ones(
+                        (tf.shape(target_input)[1], tf.shape(target_input)[1])
+                    ), -1, 0
+                )
+            )
+            dec_padding_mask = source_padding[:, tf.newaxis, tf.newaxis, :]
+            outputs, attention_weights = decoder(
+                inputs=target_input,
+                enc_output=encoder_output,
+                training=is_train,
+                look_ahead_mask=look_ahead_mask,
+                padding_mask=dec_padding_mask
+            )
+        elif params.decoder_type == 'att_gru':
+            with tf.variable_scope("attention"):
+                attention_mechanism = attention_wrapper.BahdanauAttention(
+                    num_units=params.attention_num_units,  # 1024
+                    memory=encoder_output,
+                    memory_sequence_length=source_sequence_lengths,
+                    normalize=True,
+                    dtype=float_type
+                )
+            decoder_embedding = tf.keras.layers.Embedding(
+                target_vocab_size, params.decoder_embed_dim
+            )  # 1024
+            target_embedded = decoder_embedding(target_input)
+            cell_list = []
+            for i, units in enumerate(
+                params.decoder_num_units
+            ):  # [256,256,256,256]
+                # cell
+                single_cell = tf.contrib.rnn.GRUCell(
+                    num_units=units, dtype=float_type
+                )
+                # Dropout (= 1 - keep_prob)
+                if params.decoder_dropout > 0.0:  # 0.0
+                    single_cell = tf.contrib.rnn.DropoutWrapper(
+                        cell=single_cell,
+                        input_keep_prob=(1.0 - params.decoder_dropout)
+                    )
+                # Residual
+                if i >= len(
+                    params.decoder_num_units
+                ) - params.decoder_num_residual_layers:  # 2
+                    single_cell = tf.contrib.rnn.ResidualWrapper(
+                        single_cell, residual_fn=gnmt_residual_fn
+                    )
+                cell_list.append(single_cell)
+            # Only wrap the bottom layer with the attention mechanism.
+            attention_cell = cell_list.pop(0)
+            attention_cell = attention_wrapper.AttentionWrapper(
+                cell=attention_cell,
+                attention_mechanism=attention_mechanism,
+                attention_layer_size=None,  # don't use attention layer.
+                output_attention=False,
+                alignment_history=False,
+                name="attention"
+            )
+            cell = GNMTAttentionMultiCell(attention_cell, cell_list)
+            # decoder_initial_state = tuple(
+            #     zs.clone(cell_state=es)
+            #     if isinstance(zs, attention_wrapper.AttentionWrapperState) else es
+            #     for zs, es in zip(cell.zero_state(batch_size, float_type), encoder_state))
+            decoder_initial_state = cell.zero_state(batch_size, float_type)
+            outputs, _ = tf.nn.dynamic_rnn(
+                cell,
+                target_embedded,
+                sequence_length=target_output_lengths,
+                initial_state=decoder_initial_state,
+                dtype=float_type,
+                scope=decoder_scope,
+                parallel_iterations=params.
+                dynamic_rnn_parallel_iterations,  # 32
+                time_major=False
+            )
+
         output_layer = tf.layers.Dense(
-            units=target_vocab_size, use_bias=False, name="output_projection",
-            dtype=float_type)
-        logits = output_layer(final_rnn_outputs)
+            units=target_vocab_size,
+            use_bias=False,
+            name="output_projection",
+            dtype=float_type
+        )
+        logits = output_layer(outputs)
+        # logits shape=(batch_size, tf.shape(target_output)[1], num_classes), dtype=float32
 
     if mode != tf.estimator.ModeKeys.PREDICT:
         with tf.variable_scope('loss'):
-            target_output = go[:,1:]
+            target_output = go[:, 1:]
             losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=target_output,
-                logits=tf.cast(logits, tf.float32)
+                labels=target_output, logits=tf.cast(logits, tf.float32)
             )
-            # losses shape=(batch_size, target_sequence_lengths), dtype=float32
-            mask = tf.sequence_mask(lengths=target_sequence_lengths,maxlen=tf.shape(target_output)[1],dtype=losses.dtype)
+            # losses shape=(batch_size, target_output_lengths), dtype=float32
+            mask = tf.sequence_mask(
+                lengths=target_output_lengths,
+                maxlen=tf.shape(target_output)[1],
+                dtype=losses.dtype
+            )
             masked_losses = losses * mask
-            batch_loss = tf.reduce_sum(masked_losses) / tf.cast(tf.reduce_sum(target_sequence_lengths), dtype=tf.float32)
+            batch_loss = tf.reduce_sum(masked_losses) / tf.cast(
+                tf.reduce_sum(target_output_lengths), dtype=tf.float32
+            )
 
     # predictions
     with tf.variable_scope('predictions'):
         all_probs = tf.nn.softmax(logits=logits, axis=-1, name='softmax_tensor')
         # with tf.device('/cpu:0'):
-        top_probs, top_classes = tf.nn.top_k(all_probs, params.predict_top_k) # 3
+        top_probs, top_classes = tf.nn.top_k(
+            all_probs, params.predict_top_k
+        )  # 3
         predictions = {
             # 'logits': logits,
             # Add `softmax_tensor` to the graph.
@@ -3861,7 +4330,8 @@ def model_fn(features, labels, mode, params, config):
         #     predictions['classes'] = tf.argmax(input=logits, axis=-1, output_type=tf.int32)
         classes = tf.argmax(input=logits, axis=-1, output_type=tf.int32)
         predictions['classes'] = classes
-
+        # ans = target_output[0,:target_sequence_lengths[0]]
+        # prd = classes[0,:target_sequence_lengths[0]]
 
     # if mode != tf.estimator.ModeKeys.PREDICT:
     #     # loss
@@ -3937,12 +4407,16 @@ def model_fn(features, labels, mode, params, config):
             #     )
         }
 
-        with tf.name_scope('batch_accuracy', values=[predictions['classes'], target_output]):
+        with tf.name_scope(
+            'batch_accuracy', values=[predictions['classes'], target_output]
+        ):
             is_correct = tf.cast(
-                tf.equal(predictions['classes'], target_output), tf.float32)
+                tf.equal(predictions['classes'], target_output), tf.float32
+            )
             is_correct = tf.multiply(is_correct, mask)
-            batch_accuracy = tf.math.divide(tf.reduce_sum(
-                is_correct), tf.reduce_sum(mask))
+            batch_accuracy = tf.math.divide(
+                tf.reduce_sum(is_correct), tf.reduce_sum(mask)
+            )
         tf.summary.scalar('accuracy', batch_accuracy)
 
         # with tf.name_scope('batch_accuracy', values=[predicted_labels, labels]):
@@ -4144,7 +4618,10 @@ def model_fn(features, labels, mode, params, config):
             true_fn=lambda: tf.Print(
                 train_op,
                 # data=[global_step, metrics['accuracy'][0], lengths, loss, losses, predictions['classes'], labels, mask, protein, embeddings],
-                data=[global_step, batch_accuracy, source_sequence_lengths, batch_loss, embeddings],
+                data=[
+                    global_step, batch_accuracy, source_sequence_lengths,
+                    batch_loss, embeddings
+                ],
                 message='## DEBUG LOSS: ',
                 summarize=50000
             )
@@ -4162,9 +4639,15 @@ def model_fn(features, labels, mode, params, config):
     # INFO:tensorflow:accuracy = 0.16705106, examples = 15000, loss = 9.688441, step = 150 (24.091 sec)
     def logging_formatter(v):
         return 'accuracy:\033[1;32m {:9.5%}\033[0m, loss:\033[1;32m {:8.5f}\033[0m, lr:\033[1;32m {:8.5f}\033[0m, step:\033[1;32m {:7,d}\033[0m'.format(
-            v['accuracy'],
-            v['loss'], v['learning_rate'], v['step']
+            v['accuracy'], v['loss'], v['learning_rate'], v['step']
         )
+
+    # def logging_formatter(v):
+    #     return 'accuracy:\033[1;32m {:9.5%}\033[0m, loss:\033[1;32m {:8.5f}\033[0m, lr:\033[1;32m {:8.5f}\033[0m, step:\033[1;32m {:7,d}\033[0m, ans:\033[1;32m {}\033[0m, prd:\033[1;32m {}\033[0m'.format(
+    #         v['accuracy'],
+    #         v['loss'], v['learning_rate'], v['step']
+    #         , v['ans'], v['prd']
+    #     )
 
     tensors = {
         # 'TP': TP,
@@ -4175,6 +4658,8 @@ def model_fn(features, labels, mode, params, config):
         'loss': batch_loss,
         'learning_rate': lr,
         'step': global_step
+        # 'ans': target_output[0],
+        # 'prd': classes[0]
         # 'input_size': tf.shape(protein),
         # 'examples': examples_processed
     }
@@ -4330,6 +4815,7 @@ def model_fn(features, labels, mode, params, config):
         prediction_hooks=None
     )
 
+
 # @tf.function
 # def decode(go, go_mask, decoder, dec_input, dec_hidden, enc_output, loss, predicted_correct, predicted_total):
 #     # Teacher forcing - feeding the target as the next input
@@ -4347,7 +4833,6 @@ def model_fn(features, labels, mode, params, config):
 #             dec_input = tf.expand_dims(labels, 1)
 #             # go[:, t] shape=(batch_size, ), dtype=float32
 #             # dec_input shape=(batch_size, 1), dtype=float32
-
 
 #         with tf.variable_scope('loss'):
 #             losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -4373,7 +4858,6 @@ def model_fn(features, labels, mode, params, config):
 #             predicted_total += tf.cast(tf.reduce_sum(mask), tf.int32)
 #     return loss, predicted_correct, predicted_total
 
-
 # https://github.com/tensorflow/models/blob/69cf6fca2106c41946a3c395126bdd6994d36e6b/tutorials/rnn/quickdraw/train_model.py
 
 
@@ -4390,6 +4874,7 @@ def create_estimator_and_specs(run_config):
         },
         data_version=FLAGS.data_version,
         metadata_path=FLAGS.metadata_path,
+        num_classes=FLAGS.num_classes,
         experiment_name=FLAGS.experiment_name,
         host_script_name=FLAGS.host_script_name,
         job=FLAGS.job,
@@ -4424,53 +4909,31 @@ def create_estimator_and_specs(run_config):
         encoder_embed_dim=FLAGS.encoder_embed_dim,  # 32
         decoder_embed_dim=FLAGS.decoder_embed_dim,  # 1024
         embedded_dropout=FLAGS.embedded_dropout,  # 0.2
-        use_conv_1_prenet=FLAGS.use_conv_1_prenet,  # 32
-        conv_1_prenet_dropout=FLAGS.conv_1_prenet_dropout,  # 32
-        use_conv_1_bank=FLAGS.use_conv_1_bank,  # True
-        use_conv_1_bank_odd=FLAGS.use_conv_1_bank_odd,  # False
-        conv_1_bank_size=FLAGS.conv_1_bank_size,  # 32
-        conv_1_filters=FLAGS.conv_1_filters,  # 32
-        conv_1_kernel_size=FLAGS.conv_1_kernel_size,  # 7
-        conv_1_strides=FLAGS.conv_1_strides,  # 1
-        conv_1_dropout=FLAGS.conv_1_dropout,  # 0.2
-        use_conv_batch_norm=FLAGS.use_conv_batch_norm,
-        use_conv_1_residual=FLAGS.use_conv_1_residual,
-        use_conv_1_highway=FLAGS.use_conv_1_highway,
-        conv_1_highway_depth=FLAGS.conv_1_highway_depth,
-        conv_1_highway_units=FLAGS.conv_1_highway_units,
-        use_conv_1_attention=FLAGS.use_conv_1_attention,
-        attention_key_channels=FLAGS.attention_key_channels,
-        attention_value_channels=FLAGS.attention_value_channels,
-        attention_hidden_size=FLAGS.attention_hidden_size,
-        attention_num_heads=FLAGS.attention_num_heads,
-        attention_dropout=FLAGS.attention_dropout,
-        attention_type=FLAGS.attention_type,
-        attention_block_length=FLAGS.attention_block_length,
-        attention_filter_width=FLAGS.attention_filter_width,
-        use_conv_1_attention_batch_norm=FLAGS.use_conv_1_attention_batch_norm,
-        rnn_cell_type=FLAGS.rnn_cell_type,
+        conv_filters=FLAGS.conv_filters,  # 32
+        conv_strides=FLAGS.conv_strides,  # 1
+        conv_bank_size=FLAGS.conv_bank_size,  # 15
+        conv_dropout=FLAGS.conv_dropout,  # 0.2
+        conv_highway_depth=FLAGS.conv_highway_depth,  # 3
+        conv_highway_units=FLAGS.conv_highway_units,  # 512
         encoder_num_units=FLAGS.encoder_num_units,  # list [256,256,256,256]
+        encoder_dropout=FLAGS.encoder_dropout,  # 0.0
+        use_rnn_batch_norm=FLAGS.use_rnn_batch_norm,  # True
+        decoder_type=FLAGS.decoder_type,  # att_gru
+        transformer_num_layers=FLAGS.transformer_num_layers,  # 4
+        transformer_d_model=FLAGS.transformer_d_model,  # 256
+        transformer_num_heads=FLAGS.transformer_num_heads,  # 8
+        transformer_dff=FLAGS.transformer_dff,  # 1024
+        transformer_pe_target=FLAGS.transformer_pe_target,  # 512
+        transformer_dropout_rate=FLAGS.transformer_dropout_rate,  # 0.2
+        attention_num_units=FLAGS.attention_num_units,  # 1024
         decoder_num_units=FLAGS.decoder_num_units,  # list [256,256,256,256]
-        attention_num_units=FLAGS.attention_num_units, # 1024
-        decoder_num_residual_layers=FLAGS.decoder_num_residual_layers, # 2
-        dynamic_rnn_parallel_iterations=FLAGS.dynamic_rnn_parallel_iterations, # 32
-        decoder_dropout=FLAGS.decoder_dropout, # 0.0
-        use_rnn_batch_norm=FLAGS.use_rnn_batch_norm,
-        use_rnn_attention=FLAGS.use_rnn_attention,
-        rnn_attention_hidden_size=FLAGS.rnn_attention_hidden_size,
-        use_rnn_attention_batch_norm=FLAGS.use_rnn_attention_batch_norm,
-        use_rnn_peepholes=FLAGS.use_rnn_peepholes,
-        use_output_highway=FLAGS.use_output_highway,
-        output_highway_depth=FLAGS.output_highway_depth,
-        output_highway_units=FLAGS.output_highway_units,
-        use_crf=FLAGS.use_crf,  # True
-        use_batch_renorm=FLAGS.use_batch_renorm,
-        scale_label=FLAGS.scale_label,
-        loss_pos_weight=FLAGS.loss_pos_weight,
-        num_classes=FLAGS.num_classes,
+        decoder_dropout=FLAGS.decoder_dropout,  # 0.0
+        decoder_num_residual_layers=FLAGS.decoder_num_residual_layers,  # 2
+        dynamic_rnn_parallel_iterations=FLAGS.
+        dynamic_rnn_parallel_iterations,  # 32
+        use_batch_renorm=FLAGS.use_batch_renorm,  # False
         clip_gradients_std_factor=FLAGS.clip_gradients_std_factor,  # 2.
         clip_gradients_decay=FLAGS.clip_gradients_decay,  # 0.95
-        # 6.
         clip_gradients_static_max_norm=FLAGS.clip_gradients_static_max_norm,
         learning_rate_decay_fn=FLAGS.learning_rate_decay_fn,
         learning_rate_decay_steps=FLAGS.learning_rate_decay_steps,  # 10000
@@ -4690,7 +5153,7 @@ def main(unused_args):
     if FLAGS.use_jit_xla:
         session_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1  # pylint: disable=no-member
     if FLAGS.gpu_allow_growth:
-        session_config.gpu_options.allow_growth=True
+        session_config.gpu_options.allow_growth = True
 
     estimator, train_spec, eval_spec = create_estimator_and_specs(
         run_config=tf.estimator.RunConfig(
@@ -5166,12 +5629,6 @@ if __name__ == '__main__':
         default=-1,  # 'PAD', 'NO_DOMAIN', 'UNKNOWN_DOMAIN'
         help='Number of domain classes.'
     )
-    parser.add_argument(
-        '--classes_file',
-        type=str,
-        default='',
-        help='Path to a file with the classes - one class per line'
-    )
 
     parser.add_argument(
         '--num_gpus',
@@ -5298,7 +5755,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=2,
+        default=1,
         help=
         'Batch size to use for longest sequence for training/evaluation. 1 if GPU Memory <= 6GB, 2 if <= 12GB'
     )
@@ -5316,10 +5773,16 @@ if __name__ == '__main__':
         help='Vocabulary size.'
     )
     parser.add_argument(
-        '--encoder_embed_dim', type=int, default=32, help='Encoder embedding dimensions.'
+        '--encoder_embed_dim',
+        type=int,
+        default=32,
+        help='Encoder embedding dimensions.'
     )
     parser.add_argument(
-        '--decoder_embed_dim', type=int, default=1024, help='Decoder embedding dimensions.'
+        '--decoder_embed_dim',
+        type=int,
+        default=1024,
+        help='Decoder embedding dimensions.'
     )
     parser.add_argument(
         '--embedded_dropout',
@@ -5329,164 +5792,43 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        '--use_conv_1_prenet',
-        type='bool',
-        default='True',
-        help='Add prenet before convolution layer 1.'
-    )
-    parser.add_argument(
-        '--conv_1_prenet_dropout',
-        type=float,
-        default=0.2,
-        help='Dropout rate used for prenet layer outputs.'
-    )
-    parser.add_argument(
-        '--use_conv_1_bank',
-        type='bool',
-        default='True',
-        help='Use convolution bank.'
-    )
-    parser.add_argument(
-        '--use_conv_1_bank_odd',
-        type='bool',
-        default='False',
-        help='Use convolution bank with only odd kernel sizes.'
-    )
-    parser.add_argument(
-        '--conv_1_bank_size',
-        type=int,
-        default=16,
-        help='Convolution bank kernal sizes 1 to bank_size.'
-    )
-    parser.add_argument(
-        '--conv_1_filters',
+        '--conv_filters',
         type=int,
         default=32,
         help='Number of convolution filters.'
     )
     parser.add_argument(
-        '--conv_1_kernel_size',
-        type=int,
-        default=7,
-        help='Length of the convolution filters.'
-    )
-    parser.add_argument(
-        '--conv_1_strides',
+        '--conv_strides',
         type=int,
         default=1,
         help=
         'The number of entries by which the filter is moved right at each step..'
     )
     parser.add_argument(
-        '--conv_1_dropout',
+        '--conv_bank_size',
+        type=int,
+        default=15,
+        help='Convolution bank kernal sizes 1 to bank_size.'
+    )
+    parser.add_argument(
+        '--conv_dropout',
         type=float,
         default=0.2,
         help='Dropout rate used for convolution layer outputs.'
     )
     parser.add_argument(
-        '--use_conv_batch_norm',
-        type='bool',
-        default='True',
-        help='Apply batch normalization after convolution layers.'
-    )
-    parser.add_argument(
-        '--use_conv_1_residual',
-        type='bool',
-        default='True',
-        help='Add residual connection after convolution layer 1.'
-    )
-    parser.add_argument(
-        '--use_conv_1_highway',
-        type='bool',
-        default='True',
-        help='Add a highway network after convolution layer 1.'
-    )
-    parser.add_argument(
-        '--conv_1_highway_depth',
+        '--conv_highway_depth',
         type=int,
         default=3,
         help='Number of layers of highway network.'
     )
     parser.add_argument(
-        '--conv_1_highway_units',
+        '--conv_highway_units',
         type=int,
-        default=32,
+        default=512,
         help='Number of units per layer of highway network.'
     )
-    parser.add_argument(
-        '--use_conv_1_attention',
-        type='bool',
-        default='True',
-        help='Add an attention layer after convolution layer 1.'
-    )
-    parser.add_argument(
-        '--attention_key_channels',
-        type=int,
-        default=32,
-        help='Number of attention key units.'
-    )
-    parser.add_argument(
-        '--attention_value_channels',
-        type=int,
-        default=32,
-        help='Number of attention value units.'
-    )
-    parser.add_argument(
-        '--attention_hidden_size',
-        type=int,
-        default=32,
-        help='Number of attention units.'
-    )
-    parser.add_argument(
-        '--attention_num_heads',
-        type=int,
-        default=1,
-        help='Number of attention heads.'
-    )
-    parser.add_argument(
-        '--attention_dropout',
-        type=float,
-        default=0.0,
-        help='Dropout rate used for attention.'
-    )
-    parser.add_argument(
-        '--attention_type',
-        type=str,
-        choices=['local_unmasked', 'dot_product'],
-        default='local_unmasked',
-        help='Attention Type'
-    )
-    parser.add_argument(
-        '--attention_block_length',
-        type=int,
-        default=128,
-        help='The sequence is divided into blocks of length block_length.'
-    )
-    parser.add_argument(
-        '--attention_filter_width',
-        type=int,
-        default=64,
-        help=
-        'Attention for a given query position can see all memory positions in the corresponding block and filter_width many positions to the left and right of the block.'
-    )
-    parser.add_argument(
-        '--use_conv_1_attention_batch_norm',
-        type='bool',
-        default='True',
-        help='Apply batch normalization after convolution attention layers.'
-    )
 
-    parser.add_argument(
-        '--rnn_cell_type',
-        type=str,
-        choices=[
-            'CudnnLSTM', 'CudnnGRU', 'LSTMCell', 'GRUCell', 'LayerNormLSTMCell',
-            'LayerNormLSTMCellv2', 'LSTMBlockFusedCell', 'GRUBlockCellV2',
-            'SRUCell', 'qrnn'
-        ],
-        default='CudnnGRU',
-        help='RNN Cell Type'
-    )
     parser.add_argument(
         '--encoder_num_units',
         type='list',
@@ -5494,34 +5836,10 @@ if __name__ == '__main__':
         help='Encoder recurrent network size.'
     )
     parser.add_argument(
-        '--decoder_num_units',
-        type='list',
-        default='[256,256,256,256]',
-        help='Encoder recurrent network size.'
-    )
-    parser.add_argument(
-        '--attention_num_units',
-        type=int,
-        default=1024,
-        help='The depth of the query mechanism.'
-    )
-    parser.add_argument(
-        '--decoder_num_residual_layers',
-        type=int,
-        default=2,
-        help='Number of residual layers from top to bottom. For example, if `len(decoder_num_units)=4` and `decoder_num_residual_layers=2`, the last 2 RNN cells in the returned list will be wrapped with `ResidualWrapper`.'
-    )
-    parser.add_argument(
-        '--dynamic_rnn_parallel_iterations',
-        type=int,
-        default=32,
-        help='The number of rnn iterations to run in parallel.'
-    )
-    parser.add_argument(
-        '--decoder_dropout',
+        '--encoder_dropout',
         type=float,
         default=0.0,
-        help='Dropout rate used between decoder rnn layers.'
+        help='Dropout rate used between encoder rnn layers.'
     )
     parser.add_argument(
         '--use_rnn_batch_norm',
@@ -5530,73 +5848,85 @@ if __name__ == '__main__':
         help='Apply batch normalization after recurrent layers.'
     )
     parser.add_argument(
-        '--use_rnn_attention',
-        type='bool',
-        default='True',
-        help='Add an attention layer after recurrent layers.'
+        '--decoder_type',
+        type=str,
+        choices=['att_gru', 'transformer'],
+        default='att_gru',
+        help='Decoder type'
     )
     parser.add_argument(
-        '--rnn_attention_hidden_size',
+        '--transformer_num_layers',
         type=int,
-        default=128,
-        help='Number of recurrent network layer attention output nodes.'
+        default=4,
+        help='The number of transformer decoder layers.'
     )
     parser.add_argument(
-        '--use_rnn_attention_batch_norm',
-        type='bool',
-        default='True',
-        help='Apply batch normalization after rnn attention layers.'
-    )
-    parser.add_argument(
-        '--use_rnn_peepholes',
-        type='bool',
-        default='False',
-        help=
-        'Enable diagonal/peephole connections in LayerNormLSTMCellv2 and LSTMBlockFusedCell cells.'
-    )
-    parser.add_argument(
-        '--use_output_highway',
-        type='bool',
-        default='True',
-        help='Add a highway network after rnn.'
-    )
-    parser.add_argument(
-        '--output_highway_depth',
+        '--transformer_d_model',
         type=int,
-        default=1,
-        help='Number of layers of output highway network.'
+        default=256,
+        help='Number of units for attention v, k, q, and final linear transforms.'
     )
     parser.add_argument(
-        '--output_highway_units',
+        '--transformer_num_heads',
+        type=int,
+        default=8,
+        help='The number of transformer heads.'
+    )
+    parser.add_argument(
+        '--transformer_dff',
         type=int,
         default=1024,
-        help='Number of units per layer of output highway network.'
+        help='Number of units for the Point wise feed forward network.'
+    )
+    parser.add_argument(
+        '--transformer_pe_target',
+        type=int,
+        default=512,
+        help='Maximum number of go predictions per sequence.'
+    )
+    parser.add_argument(
+        '--transformer_dropout_rate',
+        type=float,
+        default=0.2,
+        help='Dropout rate for transformer embedding.'
+    )
+    parser.add_argument(
+        '--attention_num_units',
+        type=int,
+        default=1024,
+        help='The depth of the query mechanism.'
+    )
+    parser.add_argument(
+        '--decoder_num_units',
+        type='list',
+        default='[256,256,256,256]',
+        help='Encoder recurrent network size.'
+    )
+    parser.add_argument(
+        '--decoder_dropout',
+        type=float,
+        default=0.0,
+        help='Dropout rate used between decoder rnn layers.'
+    )
+    parser.add_argument(
+        '--decoder_num_residual_layers',
+        type=int,
+        default=2,
+        help=
+        'Number of residual layers from top to bottom. For example, if `len(decoder_num_units)=4` and `decoder_num_residual_layers=2`, the last 2 RNN cells in the returned list will be wrapped with `ResidualWrapper`.'
+    )
+    parser.add_argument(
+        '--dynamic_rnn_parallel_iterations',
+        type=int,
+        default=32,
+        help='The number of rnn iterations to run in parallel.'
     )
 
     parser.add_argument(
-        '--use_crf',
-        type='bool',
-        default='False',
-        help='Calculate loss using linear chain CRF instead of Softmax.'
-    )
-    parser.add_argument(
         '--use_batch_renorm',
         type='bool',
-        default='True',
+        default='False',
         help='Use Batch Renormalization.'
-    )
-    parser.add_argument(
-        '--scale_label',
-        type=float,
-        default=0.6,
-        help='Scale labels to keep weights from exploding.'
-    )
-    parser.add_argument(
-        '--loss_pos_weight',
-        type=float,
-        default=1.0,
-        help=
-        'A value pos_weight > 1 decreases the false negative count, hence increasing the recall. Conversely setting pos_weight < 1 decreases the false positive count and increases the precision.'
     )
 
     parser.add_argument(
@@ -5623,32 +5953,32 @@ if __name__ == '__main__':
     parser.add_argument(
         '--learning_rate_decay_fn',
         type=str,
-        default='None',
+        default='exponential_decay',
         help=
         'Learning rate decay function. One of "none", "noisy_linear_cosine_decay", "exponential_decay"'
     )
     parser.add_argument(
         '--learning_rate_decay_steps',
         type=int,
-        default=27000000,  # num_batches_per_epoch * num_epochs_per_decay(8)
+        default=350000,  # num_batches_per_epoch * num_epochs_per_decay(8)
         help='Decay learning_rate by decay_rate every decay_steps.'
     )
     parser.add_argument(
         '--learning_rate_decay_rate',
         type=float,
-        default=0.95,
+        default=0.7,
         help='Learning rate decay rate.'
     )
     parser.add_argument(
         '--learning_rate',
         type=float,
-        default=0.001,
+        default=0.015,
         help='Learning rate used for training.'
     )
     parser.add_argument(
         '--warmup_steps',
         type=int,
-        default=35000,  # 10% epoch
+        default=1300,  # 10% epoch
         help='Learning rate warmup steps needed to reach specified learning_rate.'
     )
     parser.add_argument(
@@ -5681,7 +6011,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--optimizer',
         type=str,
-        default='Adam',
+        default='Momentum',
         help=
         'Optimizer to use. One of "Adagrad", "Adam", "Ftrl", "Momentum", "RMSProp", "SGD"'
     )
@@ -5710,36 +6040,6 @@ if __name__ == '__main__':
     parser.add_argument(
         '--debug', type='bool', default='False', help='Run debugging ops.'
     )
-    # parser.add_argument(
-    #     '--num_layers',
-    #     type=int,
-    #     default=3,
-    #     help='Number of recurrent neural network layers.')
-    # parser.add_argument(
-    #     '--num_conv',
-    #     type=str,
-    #     default='[48, 64, 96]',
-    #     help='Number of conv layers along with number of filters per layer.')
-    # parser.add_argument(
-    #     '--conv_len',
-    #     type=str,
-    #     default='[5, 5, 3]',
-    #     help='Length of the convolution filters.')
-    # parser.add_argument(
-    #     '--gradient_clipping_norm',
-    #     type=float,
-    #     default=9.0,
-    #     help='Gradient clipping norm used during training.')
-    # parser.add_argument(
-    #     '--cell_type',
-    #     type=str,
-    #     default='lstm',
-    #     help='Cell type used for rnn layers: cudnn_lstm, lstm or block_lstm.')
-    # parser.add_argument(
-    #     '--batch_norm',
-    #     type='bool',
-    #     default='False',
-    #     help='Whether to enable batch normalization or not.')
 
     FLAGS, unparsed = parser.parse_known_args()
     FLAGS.command = ' '.join(sys.argv)
