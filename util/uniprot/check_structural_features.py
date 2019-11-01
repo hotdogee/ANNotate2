@@ -12,10 +12,6 @@ from collections import OrderedDict
 
 # Download: ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete
 
-# windows
-# python .\util\uniprot\stats_uniprot_dat.py --dat D:/uniprot/uniprot-20190211/uniprot_sprot.dat.gz
-# python .\util\uniprot\stats_uniprot_dat.py --dat D:/uniprot/uniprot-20190211/uniprot_trembl.dat.gz
-
 # ID   001R_FRG3G              Reviewed;         256 AA.
 # AC   Q6GZX4;
 # DT   28-JUN-2011, integrated into UniProtKB/Swiss-Prot.
@@ -172,6 +168,7 @@ def uniprot_dat_to_seq_ft(path):
                 rdb, rid, *rinfo = [
                     a.strip() for a in line[5:].split(';') if a != ''
                 ]
+                vocab[lc].add(rdb)
                 entry['DR'].append(DR(rdb, rid, rinfo))
                 if rdb == 'PDB':
                     vocab[rdb].add(rid)
@@ -259,6 +256,7 @@ if __name__ == "__main__":
 
     print('==VOCAB==')
     print(f'''FT: {vocab['FT']}''')
+    print(f'''DR: {vocab['DR']}''')
 
     print('==OVERLAP==')
     for k in FT_KEYS:
@@ -284,6 +282,10 @@ if __name__ == "__main__":
     # Number of PDB IDs with more than one entry
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
+
+# windows
+# python .\util\uniprot\check_structural_features.py --dat F:/uniprot/uniprot-20190211/uniprot_sprot.dat.gz
+# python .\util\uniprot\check_structural_features.py --dat F:/uniprot/uniprot-20190211/uniprot_trembl.dat.gz
 
 # >>> s-t
 # {'MUTAGEN', 'VARIANT', 'NON_CONS', 'VAR_SEQ', 'STRAND', 'TURN', 'HELIX', 'CONFLICT'}

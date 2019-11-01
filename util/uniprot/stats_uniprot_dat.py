@@ -12,10 +12,6 @@ from collections import OrderedDict
 
 # Download: ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete
 
-# windows
-# python .\util\uniprot\stats_uniprot_dat.py --dat D:/uniprot/uniprot-20190211/uniprot_sprot.dat.gz
-# python .\util\uniprot\stats_uniprot_dat.py --dat D:/uniprot/uniprot-20190211/uniprot_trembl.dat.gz
-
 # ID   001R_FRG3G              Reviewed;         256 AA.
 # AC   Q6GZX4;
 # DT   28-JUN-2011, integrated into UniProtKB/Swiss-Prot.
@@ -99,10 +95,18 @@ from collections import OrderedDict
 # (blanks)	Sequence data	Once or more
 # //	Termination line	Once; ends the entry
 
-FT_KEYS = ['TRANSMEM', 'DNA_BIND', 'REPEAT', 'REGION', 'COMPBIAS', 'INTRAMEM', 'DOMAIN', 'CA_BIND', 'COILED', 'ZN_FING', 'NP_BIND', 'MOTIF', 'TOPO_DOM', 'HELIX', 'STRAND', 'TURN', 'ACT_SITE', 'METAL', 'BINDING', 'SITE', 'NON_STD', 'MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK', 'VAR_SEQ', 'VARIANT', 'MUTAGEN', 'CONFLICT', 'UNSURE', 'NON_CONS', 'NON_TER', 'INIT_MET', 'SIGNAL', 'TRANSIT', 'PROPEP', 'CHAIN', 'PEPTIDE']
+FT_KEYS = [
+    'TRANSMEM', 'DNA_BIND', 'REPEAT', 'REGION', 'COMPBIAS', 'INTRAMEM',
+    'DOMAIN', 'CA_BIND', 'COILED', 'ZN_FING', 'NP_BIND', 'MOTIF', 'TOPO_DOM',
+    'HELIX', 'STRAND', 'TURN', 'ACT_SITE', 'METAL', 'BINDING', 'SITE',
+    'NON_STD', 'MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK',
+    'VAR_SEQ', 'VARIANT', 'MUTAGEN', 'CONFLICT', 'UNSURE', 'NON_CONS',
+    'NON_TER', 'INIT_MET', 'SIGNAL', 'TRANSIT', 'PROPEP', 'CHAIN', 'PEPTIDE'
+]
 
 FT = namedtuple('FT', ['key', 'start', 'end'])
 DR = namedtuple('DR', ['rdb', 'rid', 'rinfo'])
+
 
 def stats_uniprot_dat(path):
     path = Path(path)
@@ -117,9 +121,9 @@ def stats_uniprot_dat(path):
     count = defaultdict(int)
     pdbid_count = defaultdict(set)
     id = ''
-    mp_e = 0 # Molecule processing
-    ptm_e = 0 # PTM
-    sf_e = 0 # Structure feathers
+    mp_e = 0  # Molecule processing
+    ptm_e = 0  # PTM
+    sf_e = 0  # Structure feathers
     entry = defaultdict(list)
     with f:
         for line in f:
@@ -136,7 +140,7 @@ def stats_uniprot_dat(path):
                 count[lc] += 1
                 # check overlapping features
                 for i in range(len(entry['FT'])):
-                    for j in range(i+1, len(entry['FT'])):
+                    for j in range(i + 1, len(entry['FT'])):
                         f1 = entry['FT'][i]
                         f2 = entry['FT'][j]
                         if f2.start <= f1.end and f2.end >= f1.start:
@@ -146,7 +150,12 @@ def stats_uniprot_dat(path):
                 has_pdb_id = len([r for r in entry['DR'] if r.rdb == 'PDB']) > 0
                 if has_pdb_id:
                     vocab['HAS_PDB_ID'].add(id)
-                has_struct_ft = len([f for f in entry['FT'] if f.key in ['HELIX', 'STRAND', 'TURN']]) > 0
+                has_struct_ft = len(
+                    [
+                        f for f in entry['FT']
+                        if f.key in ['HELIX', 'STRAND', 'TURN']
+                    ]
+                ) > 0
                 if has_struct_ft:
                     vocab['HAS_STRUCT_FT'].add(id)
                 # clear entry
@@ -156,7 +165,10 @@ def stats_uniprot_dat(path):
                 id = line.split()[1]
                 vocab[lc].add(id)
             elif lc == 'DR':
-                rdb, rid, *rinfo = [a.strip() for a in line[5:].split(';') if a != '']
+                rdb, rid, *rinfo = [
+                    a.strip() for a in line[5:].split(';') if a != ''
+                ]
+                vocab[lc].add(rdb)
                 entry['DR'].append(DR(rdb, rid, rinfo))
                 if rdb == 'PDB':
                     vocab[rdb].add(rid)
@@ -189,6 +201,7 @@ def stats_uniprot_dat(path):
                 count[key] += 1
     return vocab, count, overlap, pdbid_count
 
+
 def verify_input_path(p):
     # get absolute path to dataset directory
     path = Path(os.path.abspath(os.path.expanduser(p)))
@@ -200,21 +213,31 @@ def verify_input_path(p):
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
     return path
 
+
 def print_set_stats(n1, s1, n2, s2, unit=''):
-    print(f'''
+    print(
+        f'''
 {n1}: {len(s1)} {unit}
 {n2}: {len(s2)} {unit}
 {n1} & {n2}: {len(s1 & s2)} {unit}
 {n1} | {n2}: {len(s1 | s2)} {unit}
 {n1} - {n2}: {len(s1 - s2)} {unit}
 {n2} - {n1}: {len(s2 - s1)} {unit}
-''')
+'''
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Print some statistics of the uniprot dat.gz file.')
-    parser.add_argument('-d', '--dat', type=str, required=True,
-        help="Path to .dat.gz file, required.")
+        description='Print some statistics of the uniprot dat.gz file.'
+    )
+    parser.add_argument(
+        '-d',
+        '--dat',
+        type=str,
+        required=True,
+        help="Path to .dat.gz file, required."
+    )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
@@ -233,16 +256,24 @@ if __name__ == "__main__":
 
     print('==VOCAB==')
     print(f'''FT: {vocab['FT']}''')
+    print(f'''DR: {vocab['DR']}''')
 
     print('==OVERLAP==')
     for k in FT_KEYS:
         print(f'''{k:8} {' '.join([str(overlap[k][j]) for j in FT_KEYS])}''')
 
     print('==HAS_PDB_ID vs HAS_STRUCT_FT set stats==')
-    print_set_stats('HAS_PDB_ID', vocab['HAS_PDB_ID'], 'HAS_STRUCT_FT', vocab['HAS_STRUCT_FT'])
+    print_set_stats(
+        'HAS_PDB_ID', vocab['HAS_PDB_ID'], 'HAS_STRUCT_FT',
+        vocab['HAS_STRUCT_FT']
+    )
 
     print('==Number of PDB IDs with more than one entry==')
-    mep = sorted([(k,s) for k, s in pdbid_count.items() if len(s) > 1], key=lambda x: len(x[1]), reverse=True)
+    mep = sorted(
+        [(k, s) for k, s in pdbid_count.items() if len(s) > 1],
+        key=lambda x: len(x[1]),
+        reverse=True
+    )
     print(f'''{len(mep)}: {mep[:3]}''')
 
     # Number of unique PDB IDs in sprot
@@ -251,6 +282,10 @@ if __name__ == "__main__":
     # Number of PDB IDs with more than one entry
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
+
+# windows
+# python .\util\uniprot\stats_uniprot_dat.py --dat F:/uniprot/uniprot-20190211/uniprot_sprot.dat.gz
+# python .\util\uniprot\stats_uniprot_dat.py --dat F:/uniprot/uniprot-20190211/uniprot_trembl.dat.gz
 
 # >>> s-t
 # {'MUTAGEN', 'VARIANT', 'NON_CONS', 'VAR_SEQ', 'STRAND', 'TURN', 'HELIX', 'CONFLICT'}
@@ -511,9 +546,9 @@ if __name__ == "__main__":
 # NP_BIND  1 0 1 1 0 0 1 0 1 1 1 1 1 0 0 0 1 1 1 1 0 1 0 0 1 0 0 0 0 0 1 0 1 0 1 0 0 1 0
 # MOTIF    1 1 0 1 0 1 1 0 1 1 1 1 1 0 0 0 1 1 1 1 0 1 0 0 0 0 0 0 0 0 1 0 1 0 1 0 0 1 0
 # TOPO_DOM 1 1 1 1 0 1 1 0 1 0 1 1 1 0 0 0 1 1 1 1 0 1 1 1 1 0 0 0 0 0 1 0 1 0 1 0 0 1 0
-    # HELIX    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    # STRAND   0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    # TURN     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# HELIX    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# STRAND   0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# TURN     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 # ACT_SITE 1 0 1 1 0 0 1 0 1 0 1 1 1 0 0 0 1 1 1 1 1 1 0 0 1 1 0 0 0 0 1 0 1 0 1 0 0 1 0
 # METAL    1 1 1 1 0 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 1 0 0 1 1 0 0 0 0 1 0 1 0 1 0 0 1 0
 # BINDING  1 0 1 1 0 0 1 0 1 1 1 1 1 0 0 0 1 1 1 1 0 1 0 1 1 1 0 0 0 0 1 0 1 0 1 0 0 1 0
@@ -524,12 +559,12 @@ if __name__ == "__main__":
 # CARBOHYD 0 0 1 1 0 0 1 0 1 0 0 0 1 0 0 0 0 0 1 1 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
 # DISULFID 1 1 1 1 0 0 1 1 1 1 1 0 1 0 0 0 1 1 1 1 1 1 0 1 1 1 0 0 0 0 1 0 1 0 1 0 0 1 0
 # CROSSLNK 0 0 0 1 0 0 1 0 1 0 0 0 0 0 0 0 1 1 1 0 0 1 0 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1 0
-    # VAR_SEQ  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    # VARIANT  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    # MUTAGEN  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    # CONFLICT 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# VAR_SEQ  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# VARIANT  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# MUTAGEN  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# CONFLICT 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 # UNSURE   1 1 1 1 0 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 0 0 0 1 0 0 0 0 0 0 0 1 0 1 0 1 1 0
-    # NON_CONS 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# NON_CONS 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 # NON_TER  0 1 1 1 0 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 1 1 0 1 1 0 0 0 0 1 0 0 1 1 0 1 1 0
 # INIT_MET 1 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0
 # SIGNAL   1 1 1 1 0 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 1 1 1 0 1 0 0 0 0 0 1 0 1 0 1 1 1 1 0
@@ -559,7 +594,6 @@ if __name__ == "__main__":
 #     ('4V6X', {'RL22_HUMAN', 'RL28_HUMAN', 'RL21_HUMAN', 'RL36A_HUMAN', 'RL11_HUMAN', 'PAIRB_HUMAN', 'RL26_HUMAN', 'RL34_HUMAN', 'RL36_HUMAN', 'RS17_HUMAN', 'RL35A_HUMAN', 'RS19_HUMAN', 'RL3_HUMAN', 'RS11_HUMAN', 'RL23A_HUMAN', 'RS3_HUMAN', 'RS16_HUMAN', 'RL30_HUMAN', 'RL4_HUMAN', 'RS18_HUMAN', 'RL41_HUMAN', 'RLA0_HUMAN', 'RS21_HUMAN', 'RL37A_HUMAN', 'RL14_HUMAN', 'RS6_HUMAN', 'RSSA_HUMAN', 'RL13A_HUMAN', 'RL10A_HUMAN', 'RS29_HUMAN', 'RS27_HUMAN', 'RL23_HUMAN', 'RL24_HUMAN', 'RL39_HUMAN', 'RS13_HUMAN', 'RL19_HUMAN', 'RS14_HUMAN', 'RS8_HUMAN', 'RL10L_HUMAN', 'RS10_HUMAN', 'RS4X_HUMAN', 'RL7A_HUMAN', 'RL18A_HUMAN', 'RS20_HUMAN', 'RS26_HUMAN', 'RL12_HUMAN', 'RS24_HUMAN', 'RL13_HUMAN', 'RL17_HUMAN', 'RS9_HUMAN', 'RS15A_HUMAN', 'RS25_HUMAN', 'RS3A_HUMAN', 'RL32_HUMAN', 'RL6_HUMAN', 'RL38_HUMAN', 'RL35_HUMAN', 'RS30_HUMAN', 'RS28_HUMAN', 'RS23_HUMAN', 'RL18_HUMAN', 'RACK1_HUMAN', 'RL7_HUMAN', 'RLA2_HUMAN', 'RS15_HUMAN', 'RS7_HUMAN', 'RS2_HUMAN', 'RL5_HUMAN', 'RL37_HUMAN', 'RL31_HUMAN', 'RS27A_HUMAN', 'RL27_HUMAN', 'RS5_HUMAN', 'RL40_HUMAN', 'EF2_HUMAN', 'RL29_HUMAN', 'RL8_HUMAN', 'RL27A_HUMAN', 'RL15_HUMAN', 'RL9_HUMAN', 'RS12_HUMAN', 'RLA1_HUMAN'}),
 #     ('5DGE', {'RS22A_YEAST', 'RS30A_YEAST', 'RL22A_YEAST', 'RL37A_YEAST', 'RS4A_YEAST', 'RS31_YEAST', 'RL4A_YEAST', 'GBLP_YEAST', 'RL27A_YEAST', 'RL29_YEAST', 'RL28_YEAST', 'RL13A_YEAST', 'RL39_YEAST', 'RL3_YEAST', 'RL44A_YEAST', 'RL5_YEAST', 'RL24A_YEAST', 'RL40A_YEAST', 'RL8A_YEAST', 'RS14A_YEAST', 'RL26A_YEAST', 'RL36A_YEAST', 'RS20_YEAST', 'RL10_YEAST', 'RS26A_YEAST', 'RL32_YEAST', 'RL38_YEAST', 'RL6A_YEAST', 'RL2A_YEAST', 'RL31A_YEAST', 'RL41A_YEAST', 'RS25A_YEAST', 'RLA0_YEAST', 'RL25_YEAST', 'RL35A_YEAST', 'RL33A_YEAST', 'RS8A_YEAST', 'RL30_YEAST', 'STM1_YEAST', 'RS3A1_YEAST', 'RL14A_YEAST', 'RS13_YEAST', 'RL16A_YEAST', 'RS16A_YEAST', 'IF5A1_YEAST', 'RL19A_YEAST', 'RL43A_YEAST', 'RS9A_YEAST', 'RL12A_YEAST', 'RS28A_YEAST', 'RL7A_YEAST', 'RL20A_YEAST', 'RS7A_YEAST', 'RS10A_YEAST', 'RS6A_YEAST', 'RL11A_YEAST', 'RL18A_YEAST', 'RL34A_YEAST', 'RS23A_YEAST', 'RS29A_YEAST', 'RL21A_YEAST', 'RS2_YEAST', 'RS21A_YEAST', 'RS27A_YEAST', 'RSSA1_YEAST', 'RS3_YEAST', 'RS24A_YEAST', 'RL23A_YEAST', 'RL15A_YEAST', 'RS18A_YEAST', 'RL9A_YEAST', 'RLA1_YEAST', 'RS19A_YEAST', 'RS11A_YEAST', 'RS15_YEAST', 'RS5_YEAST', 'RS17A_YEAST', 'RL17A_YEAST', 'RS12_YEAST'}),
 #     ('5JUO', {'RS22A_YEAST', 'RS30A_YEAST', 'RL22A_YEAST', 'RL37A_YEAST', 'RS4A_YEAST', 'RL1A_YEAST', 'RL4A_YEAST', 'GBLP_YEAST', 'RS31_YEAST', 'RL27A_YEAST', 'RL29_YEAST', 'RL28_YEAST', 'RL13A_YEAST', 'RL39_YEAST', 'RL3_YEAST', 'RL44A_YEAST', 'RL5_YEAST', 'RL24A_YEAST', 'RL40A_YEAST', 'RL8A_YEAST', 'RS14A_YEAST', 'RL26A_YEAST', 'RL36A_YEAST', 'RS20_YEAST', 'RL10_YEAST', 'RS26A_YEAST', 'RL32_YEAST', 'RL38_YEAST', 'RL6A_YEAST', 'RL2A_YEAST', 'RL31A_YEAST', 'RL41A_YEAST', 'RS25A_YEAST', 'RLA0_YEAST', 'RL25_YEAST', 'RL35A_YEAST', 'RL33A_YEAST', 'RS8A_YEAST', 'RL30_YEAST', 'EF2_YEAST', 'RS3A1_YEAST', 'RL14A_YEAST', 'RS13_YEAST', 'RL16A_YEAST', 'RS16A_YEAST', 'RL19A_YEAST', 'RL43A_YEAST', 'RS9A_YEAST', 'RL12A_YEAST', 'RS28A_YEAST', 'RL7A_YEAST', 'RL20A_YEAST', 'RS7A_YEAST', 'RS10A_YEAST', 'RS6A_YEAST', 'RL11A_YEAST', 'RL18A_YEAST', 'RL34A_YEAST', 'RS23A_YEAST', 'RS29A_YEAST', 'RL21A_YEAST', 'RS2_YEAST', 'RS21A_YEAST', 'RS27A_YEAST', 'RSSA1_YEAST', 'RS3_YEAST', 'RS24A_YEAST', 'RL23A_YEAST', 'RL15A_YEAST', 'RS18A_YEAST', 'RL9A_YEAST', 'RS19A_YEAST', 'RS11A_YEAST', 'RS15_YEAST', 'RS5_YEAST', 'RS17A_YEAST', 'RL17A_YEAST', 'RS12_YEAST'})]
-
 
 # Processing: uniprot_trembl.dat.gz==COUNT==
 # ID: 139694261
