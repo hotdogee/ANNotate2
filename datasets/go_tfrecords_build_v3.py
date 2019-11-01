@@ -126,6 +126,8 @@ def verify_output_path(p):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Build GO training dataset.')
+    parser.register('type', 'bool', lambda v: v.lower() == 'true')
+    parser.register('type', 'list', lambda v: ast.literal_eval(v))
     parser.add_argument(
         '-1',
         '--gaf1',
@@ -167,6 +169,19 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Path to output train.tfrecords, required."
+    )
+    parser.add_argument(
+        '--label_type',
+        type=str,
+        choices=['multilabel', 'seq2seq'],
+        default='multilabel',
+        help='Type of label to output'
+    )
+    parser.add_argument(
+        '--ignore_iea',
+        type='bool',
+        default='True',
+        help='Do not include annotations with evidence type of IEA (Inferred from Electronic Annotation).'
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
@@ -221,7 +236,7 @@ if __name__ == "__main__":
             if seq_type != 'protein':
                 continue
             evidence = tokens[6].strip()
-            if evidence == 'IEA':
+            if args.ignore_iea and evidence == 'IEA':
                 continue
             qualifier = tokens[3].strip()
             if qualifier[:3] == 'NOT':
@@ -239,9 +254,12 @@ if __name__ == "__main__":
     index_from = 1
     aa_list = 'FLIMVPAWGSTYQNCO*UHKRDEBZX-'
     aa_index = dict(zip(aa_list, range(index_from, index_from + len(aa_list))))
-    go_list = [
-        'PAD', 'START', 'END'
-    ] + sorted(seq_count, key=lambda k: (seq_count[k], k), reverse=True)
+    if args.label_type == 'multilabel':
+        go_list = sorted(go_count, key=lambda k: (go_count[k], k), reverse=True)
+    else:
+        go_list = [
+            'PAD', 'START', 'END'
+        ] + sorted(seq_count, key=lambda k: (seq_count[k], k), reverse=True)
     go_index = dict([(d, i) for i, d in enumerate(go_list)])
     go_total = len(go_list)
     seq_list = sorted(seq_gos, key=lambda k: len(seq_gos[k]), reverse=True)
@@ -335,11 +353,16 @@ if __name__ == "__main__":
             protein = np.array(
                 [aa_index[a] for a in id_seq[seq_id]], dtype=np.uint8
             )
-            go = np.array(
-                [1] + sorted([go_index[go_id]
-                              for go_id in seq_gos[seq_id]]) + [2],
-                dtype=np.uint16
-            )
+            if args.label_type == 'multilabel':
+                go = np.zeros(go_total, dtype=np.uint8)
+                for go_id in seq_gos[seq_id]:
+                    go[go_index[go_id]] = 1
+            else:
+                go = np.array(
+                    [1] + sorted([go_index[go_id]
+                                for go_id in seq_gos[seq_id]]) + [2],
+                    dtype=np.uint16
+                )
             example = tf.train.Example(
                 features=tf.train.Features(
                     feature={
@@ -367,8 +390,13 @@ if __name__ == "__main__":
     print(f'Runtime: {time.time() - start_time:.2f} s\n')
 
 # W2125
-# python datasets/go_tfrecords_build_v3.py --gaf1 /data12/goa/goa-20191015/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20191015/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20191015/uniprot_sprot.fasta --fa4 /data12/uniprot/uniprot-20191015/uniprot_sprot_varsplic.fasta --meta /data12/goa/goa-20191015/goa-20191015-v3-meta.json --train /data12/goa/goa-20191015/goa-20191015-v3-train.tfrecords
 
+# python datasets/go_tfrecords_build_v3.py --gaf1 /data12/goa/goa-20191015/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20191015/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20191015/uniprot_sprot.fasta --fa4 /data12/uniprot/uniprot-20191015/uniprot_sprot_varsplic.fasta --meta /data12/goa/goa-20191015/goa-20191015-v3-iea-multilabel-meta.json --train /data12/goa/goa-20191015/goa-20191015-v3-iea-multilabel-train.tfrecords --label_type multilabel --ignore_iea False
+
+# python datasets/go_tfrecords_build_v3.py --gaf1 /data12/goa/goa-20191015/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20191015/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20191015/uniprot_sprot.fasta --fa4 /data12/uniprot/uniprot-20191015/uniprot_sprot_varsplic.fasta --meta /data12/goa/goa-20191015/goa-20191015-v3-iea-seq2seq-meta.json --train /data12/goa/goa-20191015/goa-20191015-v3-iea-seq2seq-train.tfrecords --label_type seq2seq --ignore_iea False
+
+# v1,v2,v3 filters:
+# seq_type == 'protein' && evidence != 'IEA' && qualifier[:3] != 'NOT'
 # Annotations: 4197534
 # Seqs with GOs: 794688
 # GOs: 27702

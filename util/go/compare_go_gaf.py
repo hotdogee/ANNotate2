@@ -149,6 +149,9 @@ if __name__ == "__main__":
 
     print(f'Runtime: {time.time() - start_time:.2f} s\n')
 
+# Conclusion
+# goa_uniprot_gcrp.gaf is a subset of goa_uniprot_all.gaf
+
 # windows
 # python .\util\go\compare_go_gaf.py --gaf1 D:/go/goa/UNIPROT/goa_uniprot_all.gaf --gaf2 D:/go/goa/UNIPROT/goa_uniprot_gcrp.gaf
 # W2125
