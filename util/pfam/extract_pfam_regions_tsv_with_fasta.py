@@ -82,7 +82,7 @@ def verify_output_path(p):
     path = Path(os.path.abspath(os.path.expanduser(p)))
     # existing file
     if path.exists():
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.EEXIST), path)
+        raise FileExistsError(errno.ENOENT, os.strerror(errno.EEXIST), path)
     # is dir
     if path.is_dir():
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
