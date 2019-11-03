@@ -77,10 +77,10 @@ from xml.etree import ElementTree as ET
 #     </Disorder>
 
 
-class OrphaCollector:
+class Orpha6Collector:
     def __init__(self):
         self.tag = None
-        self.disorder_gene = {}
+        self.orpha_gene = {}
         self.disorder = None
         self.gene = {}
         self.source = None
@@ -90,7 +90,7 @@ class OrphaCollector:
         if tag == 'Disorder':
             self.disorder = None
         elif tag == 'JDBOR':
-            self.disorder_gene = {}
+            self.orpha_gene = {}
             self.disorder = None
             self.gene = {}
             self.source = None
@@ -104,27 +104,109 @@ class OrphaCollector:
             return
         if self.tag == 'OrphaNumber' and self.disorder is None:
             self.disorder = data
-            self.disorder_gene[self.disorder] = []
+            self.orpha_gene[self.disorder] = []
         elif self.tag == 'Symbol':
             self.gene = {'symbol': data}
-            self.disorder_gene[self.disorder].append(self.gene)
+            self.orpha_gene[self.disorder].append(self.gene)
         elif self.tag == 'Source':
             self.source = data
         elif self.tag == 'Reference':
             self.gene[self.source] = data
 
     def close(self):
-        return self.disorder_gene
+        return self.orpha_gene
 
 
-def parse_orpha_xml(xml_path):
-    with xml_path.open(encoding='ISO-8859-1') as stream:
-        # stream=xml_path.open(encoding='ISO-8859-1')
-        collector = OrphaCollector()
+def parse_orpha_gene_xml(xml6_path):
+    with xml6_path.open(encoding='ISO-8859-1') as stream:
+        # stream=xml6_path.open(encoding='ISO-8859-1')
+        collector = Orpha6Collector()
         parser = ET.XMLParser(target=collector)
         ET.parse(stream, parser=parser)
-        # a=collector.disorder_gene
-    return collector.disorder_gene
+        # a=collector.orpha_gene
+    return collector.orpha_gene
+
+
+# Download: http://www.orphadata.org/data/xml/en_product4_HPO.xml
+# <?xml version="1.0" encoding="ISO-8859-1"?>
+# <JDBOR date="2019-11-01 04:09:39" version="1.2.11 / 4.1.6 [2018-04-12] (orientdb version)" copyright="Orphanet (c) 2019">
+# <Availability>
+#  <Licence>
+#     <FullName lang="en">Creative Commons Attribution 4.0 International</FullName>
+#     <ShortIdentifier>CC-BY-4.0</ShortIdentifier>
+#     <LegalCode>https://creativecommons.org/licenses/by/4.0/legalcode</LegalCode>
+#  </Licence>
+# </Availability>
+#   <DisorderList count="3771">
+#     <Disorder id="17601">
+#       <OrphaNumber>166024</OrphaNumber>
+#       <Name lang="en">Multiple epiphyseal dysplasia, Al-Gazali type</Name>
+#       <HPODisorderAssociationList count="16">
+#         <HPODisorderAssociation id="39666">
+#           <HPO id="4">
+#             <HPOId>HP:0000256</HPOId>
+#             <HPOTerm>Macrocephaly</HPOTerm>
+#           </HPO>
+#           <HPOFrequency id="28412">
+#             <OrphaNumber>453311</OrphaNumber>
+#             <Name lang="en">Very frequent (99-80%)</Name>
+#           </HPOFrequency>
+#           <DiagnosticCriteria/>
+#         </HPODisorderAssociation>
+#         <HPODisorderAssociation id="39667">
+#           <HPO id="779">
+#             <HPOId>HP:0000272</HPOId>
+#             <HPOTerm>Malar flattening</HPOTerm>
+#           </HPO>
+#           <HPOFrequency id="28412">
+#             <OrphaNumber>453311</OrphaNumber>
+#             <Name lang="en">Very frequent (99-80%)</Name>
+#           </HPOFrequency>
+#           <DiagnosticCriteria/>
+#         </HPODisorderAssociation>
+#       </HPODisorderAssociationList>
+#     </Disorder>
+
+
+class Orpha4Collector:
+    def __init__(self):
+        self.tag = None
+        self.orpha_phenotype = {}
+        self.disorder = None
+
+    def start(self, tag, attr):
+        self.tag = tag
+        if tag == 'Disorder':
+            self.disorder = None
+        elif tag == 'JDBOR':
+            self.orpha_phenotype = {}
+            self.disorder = None
+
+    def end(self, tag):
+        pass
+
+    def data(self, data):
+        data = data.strip()
+        if not data:
+            return
+        if self.tag == 'OrphaNumber' and self.disorder is None:
+            self.disorder = data
+            self.orpha_phenotype[self.disorder] = set()
+        elif self.tag == 'HPOId':
+            self.orpha_phenotype[self.disorder].add(data)
+
+    def close(self):
+        return self.orpha_phenotype
+
+
+def parse_orpha_phenotype_xml(xml4_path):
+    with xml4_path.open(encoding='ISO-8859-1') as stream:
+        # stream=xml4_path.open(encoding='ISO-8859-1')
+        collector = Orpha4Collector()
+        parser = ET.XMLParser(target=collector)
+        ET.parse(stream, parser=parser)
+        # a=collector.orpha_phenotype
+    return collector.orpha_phenotype
 
 
 def verify_input_path(p):
@@ -189,12 +271,12 @@ def verify_outdir_path(p, required_empty=True):
 def print_set_stats(n1, s1, n2, s2, unit=''):
     print(
         f'''
-{n1}: {len(s1)} {unit}
-{n2}: {len(s2)} {unit}
-{n1} & {n2}: {len(s1 & s2)} {unit}
-{n1} | {n2}: {len(s1 | s2)} {unit}
-{n1} - {n2}: {len(s1 - s2)} {unit}
-{n2} - {n1}: {len(s2 - s1)} {unit}
+{n1}: {len(s1)} {unit} ({list(s1)[:5]})
+{n2}: {len(s2)} {unit} ({list(s2)[:5]})
+{n1} & {n2}: {len(s1 & s2)} {unit} ({list(s1 & s2)[:5]})
+{n1} | {n2}: {len(s1 | s2)} {unit} ({list(s1 | s2)[:5]})
+{n1} - {n2}: {len(s1 - s2)} {unit} ({list(s1 - s2)[:5]})
+{n2} - {n1}: {len(s2 - s1)} {unit} ({list(s2 - s1)[:5]})
 '''
     )
 
@@ -204,24 +286,33 @@ if __name__ == "__main__":
         description='Print some statistics of the orpha en_product6.xml file.'
     )
     parser.add_argument(
-        '-x',
-        '--xml',
+        '-6',
+        '--xml6',
         type=str,
         required=True,
-        help="Path to .xml file, required."
+        help="Path to en_product6.xml file, required."
+    )
+    parser.add_argument(
+        '-4',
+        '--xml4',
+        type=str,
+        required=True,
+        help="Path to en_product4_HPO.xml file, required."
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
-    xml_path = verify_input_path(args.xml)
-    print(f'Processing: {xml_path.name}')
+    xml6_path = verify_input_path(args.xml6)
+    xml4_path = verify_input_path(args.xml4)
+    print(f'Processing: {xml6_path.name}, {xml4_path.name}')
 
-    disorder_gene = parse_orpha_xml(xml_path)
+    orpha_gene = parse_orpha_gene_xml(xml6_path)
+    orpha_phenotype = parse_orpha_phenotype_xml(xml4_path)
 
-    print('==COUNT==')
-    print(f'Disorders: {len(disorder_gene)}')
+    print('==COUNT ORPHA_GENE==')
+    print(f'Disorders: {len(orpha_gene)}')
     annotations = [
-        gene for disorder in disorder_gene for gene in disorder_gene[disorder]
+        gene for disorder in orpha_gene for gene in orpha_gene[disorder]
     ]
     print(f'Disorder to Gene annotations: {len(annotations)}')
     print(
@@ -230,8 +321,17 @@ if __name__ == "__main__":
     print(
         f' - no Ensembl reference: {len([a for a in annotations if "Ensembl" not in a])}'
     )
+    print('')
+    print('==COUNT ORPHA_HPO==')
+    print(f'Disorders: {len(orpha_phenotype)}')
+
+    print('')
+    print('==SET STATS==')
+    print_set_stats(
+        'ORPHA_GENE', set(orpha_gene), 'ORPHA_HPO', set(orpha_phenotype)
+    )
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
 
 # windows
-# python .\util\hpo\orpha\stats_orpha_xml.py --xml E:\hpo\orpha-20191101\en_product6.xml
+# python .\util\hpo\orpha\stats_orpha_xml.py --xml6 E:\hpo\orpha-20191101\en_product6.xml  --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml
