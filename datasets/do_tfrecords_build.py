@@ -141,21 +141,21 @@ if __name__ == "__main__":
         '--fa2',
         type=str,
         required=True,
-        help="Path to the uniprot_trembl.fasta[.gz] file, required."
+        help="Path to the uniprot trembl fasta file, required."
     )
     parser.add_argument(
         '-3',
         '--fa3',
         type=str,
         required=True,
-        help="Path to the uniprot_sprot.fasta[.gz] file, required."
+        help="Path to the uniprot sprot fasta file, required."
     )
     parser.add_argument(
         '-4',
         '--fa4',
         type=str,
         required=True,
-        help="Path to the uniprot_sprot_varsplic.fasta[.gz] file, required."
+        help="Path to the uniprot sprot_varsplic fasta file, required."
     )
     parser.add_argument(
         '-m',
