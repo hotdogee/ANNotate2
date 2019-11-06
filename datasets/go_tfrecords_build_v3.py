@@ -390,8 +390,20 @@ if __name__ == "__main__":
 # W2125
 
 # python datasets/go_tfrecords_build_v3.py --gaf1 /data12/goa/goa-20191015/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20191015/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20191015/uniprot_sprot.fasta --fa4 /data12/uniprot/uniprot-20191015/uniprot_sprot_varsplic.fasta --meta /data38/goa/goa-20191015/goa-20191015-v3-iea-multilabel-meta.json --train /data38/goa/goa-20191015/goa-20191015-v3-iea-multilabel-train.tfrecords --label_type multilabel --ignore_iea False
+# Annotations: 681960387
+# Seqs with GOs: 111669385
+# GOs: 29402
+# Sequences: 111381949
+# Runtime: 46669.95 s
+# 3.1T: /data38/goa/goa-20191015/goa-20191015-v3-iea-multilabel-train.tfrecords
 
 # python datasets/go_tfrecords_build_v3.py --gaf1 /data12/goa/goa-20191015/goa_uniprot_all.gaf --fa2 /data12/uniprot/uniprot-20191015/uniprot_trembl.fasta --fa3 /data12/uniprot/uniprot-20191015/uniprot_sprot.fasta --fa4 /data12/uniprot/uniprot-20191015/uniprot_sprot_varsplic.fasta --meta /data38/goa/goa-20191015/goa-20191015-v3-iea-seq2seq-meta.json --train /data38/goa/goa-20191015/goa-20191015-v3-iea-seq2seq-train.tfrecords --label_type seq2seq --ignore_iea False
+# Annotations: 681960387
+# Seqs with GOs: 111669385
+# GOs: 29402
+# Sequences: 111381949
+# Runtime: 11465.62 s
+# 46G: /data38/goa/goa-20191015/goa-20191015-v3-iea-seq2seq-train.tfrecords
 
 # v1,v2,v3 filters:
 # seq_type == 'protein' && evidence != 'IEA' && qualifier[:3] != 'NOT'

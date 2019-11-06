@@ -207,13 +207,17 @@ def index_uniprot_fa(path, gene_seq, whitelist):
     pattern = re.compile(r'^.+?GN=([^= ]+)')
     with f, tqdm(
         total=target,
-        unit='bytes',
         dynamic_ncols=True,
         ascii=True,
-        desc=path.name
+        desc=path.name,
+        unit='B',
+        unit_scale=True,
+        unit_divisor=1024
     ) as t:
         for line in f:
             t.update(len(line))
+            if t.n > t.total:
+                t.total += 2**32
             # empty line
             line = line.strip()
             if len(line) > 0 and line[0] == '>':
@@ -230,8 +234,8 @@ def index_uniprot_fa(path, gene_seq, whitelist):
             else:
                 sequence += line
         if sequence:
-            if uid in whitelist:
-                id_seq[uid] = sequence
+            if symbol in whitelist:
+                gene_seq[symbol].add(sequence)
             sequence = ''
     return
 
@@ -433,7 +437,7 @@ if __name__ == "__main__":
         phenotypes_set = set([p.hpo for p in phenotypes])
         for gene_symbol in omim_gene[omim]:
             hpo_omim_gene_phenotype[gene_symbol] |= phenotypes_set
-    print(f'count {count}')
+    # print(f'count {count}')
 
     org2p_gene_phenotype = parse_hpo_genes_to_phenotype(org2p_path)
     orp2g_gene_phenotype = parse_hpo_phenotype_to_genes(orp2g_path)
@@ -599,6 +603,8 @@ if __name__ == "__main__":
                 for p in decipher_gene_phenotype[g]
             ]
         )
+
+    # total number of genes with phenotype annotations
     gene_phenotype = defaultdict(set)
     for g, p in gene_phenotype_set:
         gene_phenotype[g].add(p)
@@ -606,11 +612,34 @@ if __name__ == "__main__":
 
     # read sequences
     gene_seq = defaultdict(set)
-    index_uniprot_fa(fa1_path, gene_seq, gene_phenotype)
-    index_uniprot_fa(fa2_path, gene_seq, gene_phenotype)
     index_uniprot_fa(fa3_path, gene_seq, gene_phenotype)
-    print(f'gene_seq Genes: {len(gene_seq)}')
-    print(f'gene_seq Seqs: {set([s for g in gene_seq for s in gene_seq[g]])}')
+    # make a gene list sorted by number of sequences from most to least
+    gene_list = sorted(gene_seq, key=lambda k: (len(gene_seq[k]), k), reverse=True)
+    print(f'{fa3_path.name}')
+    print(f'Genes:')
+    print(f' - Total: {len(gene_seq)}')
+    print(f'Seqs:')
+    print(f' - Total: {len(set([s for g in gene_seq for s in gene_seq[g]]))}')
+    print(f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}')
+    index_uniprot_fa(fa2_path, gene_seq, gene_phenotype)
+    print(f'+ {fa2_path.name}')
+    print(f'Genes:')
+    print(f' - Total: {len(gene_seq)}')
+    print(f'Seqs:')
+    print(f' - Total: {len(set([s for g in gene_seq for s in gene_seq[g]]))}')
+    print(f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}')
+    index_uniprot_fa(fa1_path, gene_seq, gene_phenotype)
+    print(f'+ {fa1_path.name}')
+    print(f'Genes:')
+    print(f' - Total: {len(gene_seq)}')
+    print(f'Seqs:')
+    print(f' - Total: {len(set([s for g in gene_seq for s in gene_seq[g]]))}')
+    print(f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}')
+
+    # list some genes without a protein sequence
+    genes_without_sequence = set(gene_phenotype) - set(gene_seq)
+    print(f'Genes without a sequence ({len(genes_without_sequence)}): {genes_without_sequence}')
+    
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
 
@@ -619,7 +648,150 @@ if __name__ == "__main__":
 
 # python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --xml6 E:\hpo\orpha-20191101\en_product6.xml --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml --org2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --orp2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv
 
-# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --xml6 E:\hpo\orpha-20191101\en_product6.xml --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml --org2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --orp2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv --fa1 F:\uniprot\uniprot-20191015\uniprot_trembl.fasta.gz --fa2 F:\uniprot\uniprot-20191015\uniprot_sprot.fasta --fa3 F:\uniprot\uniprot-20191015\uniprot_sprot_varsplic.fasta
+# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --xml6 E:\hpo\orpha-20191101\en_product6.xml --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml --org2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --orp2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv --fa1 F:\uniprot\uniprot-20191015\uniprot_trembl.fasta --fa2 F:\uniprot\uniprot-20191015\uniprot_sprot.fasta --fa3 F:\uniprot\uniprot-20191015\uniprot_sprot_varsplic.fasta
 
 
 # Use ORPHA|HPO_ORPHA|HPO_ORPHA_G2P for Orpha dataset
+
+# Processing: phenotype.hpoa, en_product6.xml, en_product4_HPO.xml, ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt, ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt, mim2gene.txt, DDG2P_1_11_2019.csv
+# ==HPO==
+# Disorders: 11372
+# Disorder to phenotype annotations: 190530
+#  - IEA (inferred from electronic annotation): 53279
+#  - PCS (published clinical study): 9724
+#  - ICE (individual clinical experience): 0
+#  - TAS (traceable author statement): 127527
+#  - evidence list: {'PCS', 'IEA', 'TAS'}
+#  - decipher disorders: 47
+#  - omim disorders: 7623
+#  - orpha disorders: 3702
+
+# ==ORPHA_GENE==
+# Disorders: 3792
+# Disorder to gene annotations: 7537
+#  - no SwissProt reference: 127
+#  - no Ensembl reference: 50
+
+# ==ORPHA_HPO==
+# Disorders: 3771
+
+# ==OMIM==
+# Disorders: 16104
+
+# ==HPO_ORPHA_G2P==
+# Genes: 4231
+# ==HPO_ORPHA_P2G==
+# Genes: 4231
+# ==HPO_ORPHA==
+# Genes: 2730
+# ==ORPHA==
+# Genes: 2763
+# ==OMIM==
+# Genes: 23
+# ==DECIPHER==
+# Genes: 1370
+
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 4313  (['CAV3', 'FANCE', 'ZDHHC15', 'PTPN1', 'TINF2'])
+# DECIPHER: 1370  (['FANCE', 'ZDHHC15', 'MTO1', 'UROC1', 'HPRT1'])
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P & DECIPHER: 1326  (['FANCE', 'ZDHHC15', 'MTO1', 'UROC1', 'HPRT1'])
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P | DECIPHER: 4357  (['CAV3', 'FANCE', 'ZDHHC15', 'PTPN1', 'TINF2'])
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P - DECIPHER: 2987  (['IL2RB', 'CAV3', 'PTPN1', 'TINF2', 'HLA-DQB1'])
+# DECIPHER - ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 44  (['NRXN3', 'C8orf37', 'EPRS', 'APOPT1', 'MED13'])
+
+
+# ==SET STATS==
+
+# HPO_ORPHA: 3702  (['281090', '261476', '99750', '2698', '254361'])
+# ORPHA_GENE: 3792  (['79246', '228179', '281090', '2698', '254361'])
+# HPO_ORPHA & ORPHA_GENE: 2008  (['281090', '2698', '254361', '319199', '220295'])
+# HPO_ORPHA | ORPHA_GENE: 5486  (['79246', '281090', '261476', '2698', '254361'])
+# HPO_ORPHA - ORPHA_GENE: 1694  (['261476', '99750', '293987', '436003', '85319'])
+# ORPHA_GENE - HPO_ORPHA: 1784  (['79246', '228179', '97234', '276603', '157716'])
+
+
+# HPO_ORPHA: 3702  (['281090', '261476', '99750', '2698', '254361'])
+# ORPHA_HPO: 3771  (['281090', '261476', '99750', '2698', '254361'])
+# HPO_ORPHA & ORPHA_HPO: 3702  (['281090', '261476', '99750', '2698', '254361'])
+# HPO_ORPHA | ORPHA_HPO: 3771  (['281090', '261476', '2698', '254361', '319199'])
+# HPO_ORPHA - ORPHA_HPO: 0  ([])
+# ORPHA_HPO - HPO_ORPHA: 69  (['357001', '247262', '331206', '95455', '275555'])
+
+
+# HPO_OMIM: 7623  (['300310', '120433', '601216', '616562', '136580'])
+# OMIM_GENE: 16104  (['607729', '612377', '604258', '605096', '616254'])
+# HPO_OMIM & OMIM_GENE: 23  (['152200', '151430', '400003', '610271', '240400'])
+# HPO_OMIM | OMIM_GENE: 23704  (['300310', '607729', '612377', '605096', '618338'])
+# HPO_OMIM - OMIM_GENE: 7600  (['300310', '120433', '601216', '616562', '136580'])
+# OMIM_GENE - HPO_OMIM: 16081  (['607729', '612377', '604258', '605096', '616254'])
+
+
+# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# HPO_ORPHA_P2G: 552814  ([('MED25', 'HP:0001263'), ('STAT1', 'HP:0004348'), ('SLC34A3', 'HP:0025031'), ('DPF2', 'HP:0003549'), ('ARCN1', 'HP:0000218')])
+# HPO_ORPHA_G2P & HPO_ORPHA_P2G: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# HPO_ORPHA_G2P | HPO_ORPHA_P2G: 552814  ([('MED25', 'HP:0001263'), ('SLC34A3', 'HP:0025031'), ('ARCN1', 'HP:0000218'), ('COX3', 'HP:0025142'), ('SC5D', 'HP:0008428')])
+# HPO_ORPHA_G2P - HPO_ORPHA_P2G: 0  ([])
+# HPO_ORPHA_P2G - HPO_ORPHA_G2P: 391811  ([('STAT1', 'HP:0004348'), ('SLC34A3', 'HP:0025031'), ('DPF2', 'HP:0003549'), ('COX3', 'HP:0025142'), ('SC5D', 'HP:0008428')])
+
+
+# HPO_ORPHA: 111511  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA: 109591  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# HPO_ORPHA & ORPHA: 106750  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# HPO_ORPHA | ORPHA: 114352  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490'), ('AP4M1', 'HP:0001263')])
+# HPO_ORPHA - ORPHA: 4761  ([('EDAR', 'HP:0000007'), ('GDF5', 'HP:0000006'), ('SEC24D', 'HP:0000006'), ('DISC1', 'HP:0000007'), ('DPP9', 'HP:0001426')])
+# ORPHA - HPO_ORPHA: 2841  ([('KCNQ1OT1', 'HP:0002564'), ('PIK3CA', 'HP:0100843'), ('PHKG2', 'HP:0001395'), ('KMT2A', 'HP:0007930'), ('PHKA2', 'HP:0002240')])
+
+
+# HPO_ORPHA: 111511  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# HPO_ORPHA & HPO_ORPHA_G2P: 98315  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# HPO_ORPHA | HPO_ORPHA_G2P: 174199  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# HPO_ORPHA - HPO_ORPHA_G2P: 13196  ([('POLG2', 'HP:0001251'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285'), ('MT-ND4', 'HP:0002076'), ('SUFU', 'HP:0011442')])
+# HPO_ORPHA_G2P - HPO_ORPHA: 62688  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
+
+
+# ORPHA: 109591  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# ORPHA & HPO_ORPHA_G2P: 95795  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA | HPO_ORPHA_G2P: 174799  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# ORPHA - HPO_ORPHA_G2P: 13796  ([('PIK3CA', 'HP:0100843'), ('POLG2', 'HP:0001251'), ('PHKG2', 'HP:0001395'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285')])
+# HPO_ORPHA_G2P - ORPHA: 65208  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
+
+
+# ORPHA|HPO_ORPHA: 114352  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490'), ('AP4M1', 'HP:0001263')])
+# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# ORPHA|HPO_ORPHA & HPO_ORPHA_G2P: 98663  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA|HPO_ORPHA | HPO_ORPHA_G2P: 176692  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# ORPHA|HPO_ORPHA - HPO_ORPHA_G2P: 15689  ([('PHKG2', 'HP:0001395'), ('PIK3CA', 'HP:0100843'), ('POLG2', 'HP:0001251'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285')])
+# HPO_ORPHA_G2P - ORPHA|HPO_ORPHA: 62340  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
+
+
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 176692  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# DECIPHER: 28710  ([('BMP4', 'HP:0000202'), ('PTS', 'HP:0000737'), ('ALDH18A1', 'HP:0001328'), ('RAPSN', 'HP:0001260'), ('SRD5A3', 'HP:0000007')])
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P & DECIPHER: 24992  ([('BMP4', 'HP:0000202'), ('PTS', 'HP:0000737'), ('ALDH18A1', 'HP:0001328'), ('SRD5A3', 'HP:0000007'), ('FTO', 'HP:0001276')])
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P | DECIPHER: 180410  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P - DECIPHER: 151700  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# DECIPHER - ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 3718  ([('GJA1', 'HP:0006482'), ('SMARCA4', 'HP:0003083'), ('GJA1', 'HP:0002645'), ('TTC8', 'HP:0001773'), ('RPGRIP1L', 'HP:0000272')])
+
+# gene_phenotype Genes: 4357
+# uniprot_sprot_varsplic.fasta
+# Genes:
+#  - Total: 2700
+# Seqs:
+#  - Total: 6836
+#  - Max, Median, Min: 40, 2, 1
+# uniprot_sprot.fasta: 100%|###########################################################################################################################################################################################################################################################################################################################| 277017792/277017792 [00:07<00:00, 38662486.39bytes/s] 
+# + uniprot_sprot.fasta
+# Genes:
+#  - Total: 4235
+# Seqs:
+#  - Total: 23024
+#  - Max, Median, Min: 44, 3, 2
+# uniprot_trembl.fasta.gz: 100%|###################################################################################################################################################################################################################################################################################################################| 80312776613/80312776613 [49:11<00:00, 27209386.06bytes/s] 
+# + uniprot_trembl.fasta.gz
+# Genes:
+#  - Total: 4248
+# Seqs:
+#  - Total: 1028942
+#  - Max, Median, Min: 393, 230, 107
+# Genes without a sequence (109): {'TRNN', 'HYMAI', 'DUX4L1', 'TRNS1', 'MT-TV', 'SPG16', 'GNAS-AS1', 'KCNQ1OT1', 'MACROH2A1', 'USH1K', 'MT-TN', 'HELLPAR', 'CXORF56', 'DYT13', 'MT-TK', 'USH1E', 'TRNS2', 'MT-TT', 'PWRN1', 'XIST', 'GARS1', 'USH1H', 'MT-TF', 'SARS1', 'SNORD116-1', 'SPG37', 'FRA16E', 'MT-TW', 'TRNC', 'SCA30', 'IARS1', 'AARS1', 'SPG34', 'SLC7A2-IT1', 'SPG14', 'PWAR1', 'TRNQ', 'SCA37', 'MT-TS2', 'SNORD115-1', 'HBB-LCR', 'EPRS1', 'KIFBP', 'MIR184', 'TRNL2', 'OPA2', 'C12ORF57', 'RNU4ATAC', 'MKRN3-AS1', 'H1-4', 'MT-TP', 'H19-ICR', 'TRNK', 'SCA20', 'SNORD118', 'TRNW', 'DARS1', 'TRNI', 'MT-TE', 'SPG25', 'RARS1', 'SPG23', 'TRNE', 'MIR96', 'C12ORF4', 'MT-TQ', 'MIR204', 'SCA25', 'SPG41', 'SPG29', 'TRNT', 'IL12A-AS1', 'DISC2', 'MT-TL1', 'IPW', 'FMR3', 'SPG36', 'SCA32', 'C9ORF72', 'MT-TH', 'MARS1', 'RNU12', 'DYT17', 'WHCR', 'STING1', 'YARS1', 'TRNV', 'KARS1', 'GINGF2', 'TRNF', 'DYT15', 'LARS1', 'ARSL', 'SPG38', 'SPG19', 'DYT21', 'TRNP', 'SPG32', 'SPG27', 'QARS1', 'MT-TS1', 'TRNL1', 'RMRP', 'C11ORF95', 'MT-TL2', 'HARS1', 'ADSS1', 'SPG24', 'C15ORF41'}
+# Run time: 2968.80 s
