@@ -30,7 +30,7 @@ from ..verify_paths import verify_input_path, verify_output_path, verify_indir_p
 
 def parse_hpoa(hpoa_path):
     Phenotype = namedtuple('Phenotype', ['hpo', 'evidence'])
-    disorder_phenotype = defaultdict(set)
+    hpo_disorder_phenotype = defaultdict(set)
     with hpoa_path.open(mode='r', encoding='utf-8') as f:
         for line in f:
             # empty line
@@ -47,8 +47,8 @@ def parse_hpoa(hpoa_path):
             evidence = tokens[5].strip()
             if qualifier == 'NOT':
                 continue
-            disorder_phenotype[disorder].add(Phenotype(hpo, evidence))
-    return disorder_phenotype
+            hpo_disorder_phenotype[disorder].add(Phenotype(hpo, evidence))
+    return hpo_disorder_phenotype
 
 
 # ORPHA_ALL_FREQUENCIES_genes_to_phenotype.txt
@@ -122,6 +122,49 @@ def parse_omim_to_genes(path):
     return omim_gene
 
 
+# morbidmap.txt
+# # Copyright (c) 1966-2019 Johns Hopkins University. Use of this file adheres to the terms specified at https://omim.org/help/agreement.
+# # Generated: 2019-11-08
+# # See end of file for additional documentation on specific fields
+# # Phenotype	Gene Symbols	MIM Number	Cyto Location
+# 17,20-lyase deficiency, isolated, 202110 (3)	CYP17A1, CYP17, P450C17	609300	10q24.32
+# 17-alpha-hydroxylase/17,20-lyase deficiency, 202110 (3)	CYP17A1, CYP17, P450C17	609300	10q24.32
+# 2-aminoadipic 2-oxoadipic aciduria, 204750 (3)	DHTKD1, KIAA1630, AMOXAD, CMT2Q	614984	10p14
+# 2-methylbutyrylglycinuria, 610006 (3)	ACADSB, SBCAD	600301	10q26.13
+# 3-M syndrome 1, 273750 (3)	CUL7, 3M1	609577	6p21.1
+# 3-M syndrome 2, 612921 (3)	OBSL1, KIAA0657, 3M2	610991	2q35
+# 3-M syndrome 3, 614205 (3)	CCDC8, 3M3	614145	19q13.32
+# {Yao syndrome}, 617321 (3)	NOD2, CARD15, IBD1, CD, YAOS, BLAUS	605956	16q12.1
+# {von Hippel-Lindau syndrome, modifier of}, 193300 (3)	CCND1, PRAD1, BCL1	168461	11q13.3
+# [Beta-glycopyranoside tasting], 617956 (3) {Alcohol dependence, susceptibility to}, 103780 (3)	TAS2R16, T2R16, BGLPT	604867	7q31.32
+# Wilms tumor, type 1, 194070 (3)	WT1, NPHS4	607102	11p13
+# Wilms tumor, type 3 (2)	WT3	194090	16q
+# Wilms tumor, type 4 (2)	WT4	601363	17q12-q21
+# (?:, (\d*))? \(\d\)
+def parse_omim_morbidmap(path):
+    parse_phenotype_mim = re.compile(r'(?:, (\d*))? \(\d\)')
+    omim_gene = defaultdict(set)
+    with path.open(mode='r', encoding='utf-8') as f:
+        for line in f:
+            # empty line
+            line_s = line.strip()
+            if len(line_s) == 0 or line_s[0] == '#':
+                continue
+            # parse
+            tokens = line.split('\t')
+            phenotype = tokens[0].strip()
+            gene_symbols = [t.strip() for t in tokens[1].strip().split(',')]
+            mims = [tokens[2].strip()] + parse_phenotype_mim.findall(phenotype)
+            for m in mims:
+                if not m:
+                    continue
+                # if m in omim_gene:
+                #     print(f'==DEBUG: {m} mim already in omim_gene')
+                for g in gene_symbols:
+                    omim_gene[m].add(g)
+    return omim_gene
+
+
 # DDG2P_1_11_2019.csv
 # "gene symbol","gene mim","disease name","disease mim","DDD category","allelic requirement","mutation consequence",phenotypes,"organ specificity list",pmids,panel,"prev symbols","hgnc id","gene disease pair entry date"
 # HMX1,142992,"OCULOAURICULAR SYNDROME",612109,probable,biallelic,"loss of function",HP:0000007;HP:0000482;HP:0000647;HP:0007906;HP:0000568;HP:0000589;HP:0000639;HP:0000518;HP:0001104,Eye;Ear,18423520,DD,,5017,"2015-07-22 16:14:07"
@@ -132,7 +175,12 @@ def parse_omim_to_genes(path):
 #     if count == 10:
 #         break
 def parse_decipher_ddg2p(path):
-    fieldnames=['gene symbol', 'gene mim', 'disease name', 'disease mim', 'DDD category', 'allelic requirement', 'mutation consequence', 'phenotypes', 'organ specificity list', 'pmids', 'panel', 'prev symbols', 'hgnc id', 'gene disease pair entry date']
+    fieldnames = [
+        'gene symbol', 'gene mim', 'disease name', 'disease mim',
+        'DDD category', 'allelic requirement', 'mutation consequence',
+        'phenotypes', 'organ specificity list', 'pmids', 'panel',
+        'prev symbols', 'hgnc id', 'gene disease pair entry date'
+    ]
     decipher_gene_phenotype = defaultdict(set)
     with path.open(mode='r', encoding='utf-8') as f:
         rows = csv.reader(f)
@@ -142,9 +190,7 @@ def parse_decipher_ddg2p(path):
             if count == 1:
                 continue
             # assert length == 14
-            assert (
-                len(row) == 14
-            ), f'token length: {len(row)}, expected: 14'
+            assert (len(row) == 14), f'token length: {len(row)}, expected: 14'
             gene_symbol = row[0].strip()
             if not gene_symbol:
                 continue
@@ -228,7 +274,7 @@ def index_uniprot_fa(path, gene_seq, whitelist):
                 # parse header
                 match = pattern.match(line)
                 if match:
-                    symbol = match.group(1)
+                    symbol = match.group(1).upper()
                 else:
                     symbol = None
             else:
@@ -250,51 +296,58 @@ if __name__ == "__main__":
         '--hpoa',
         type=str,
         required=True,
-        help="Path to .hpoa file, required."
+        help="Path to HPO phenotype.hpoa file, required."
     )
     parser.add_argument(
         '-x6',
-        '--xml6',
+        '--orpha6',
         type=str,
         required=True,
-        help="Path to en_product6.xml file, required."
+        help="Path to ORPHA en_product6.xml file, required."
     )
     parser.add_argument(
         '-x4',
-        '--xml4',
+        '--orpha4',
         type=str,
         required=True,
-        help="Path to en_product4_HPO.xml file, required."
+        help="Path to ORPHA en_product4_HPO.xml file, required."
     )
     parser.add_argument(
-        '-rp',
-        '--org2p',
+        '-gp',
+        '--hpog2p',
         type=str,
         required=True,
         help=
-        "Path to ORPHA_ALL_FREQUENCIES_genes_to_phenotype.txt file, required."
+        "Path to HPO ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt file, required."
     )
     parser.add_argument(
-        '-rg',
-        '--orp2g',
+        '-pg',
+        '--hpop2g',
         type=str,
         required=True,
         help=
-        "Path to ORPHA_ALL_FREQUENCIES_phenotype_to_genes.txt file, required."
+        "Path to HPO ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt file, required."
     )
     parser.add_argument(
         '-o',
         '--omim',
         type=str,
         required=True,
-        help="Path to mim2gene.txt file, required."
+        help="Path to OMIM mim2gene.txt file, required."
+    )
+    parser.add_argument(
+        '-om',
+        '--omim_morbidmap',
+        type=str,
+        required=True,
+        help="Path to OMIM morbidmap.txt file, required."
     )
     parser.add_argument(
         '-d',
         '--ddg2p',
         type=str,
         required=True,
-        help="Path to DDG2P_1_11_2019.csv file, required."
+        help="Path to DECIPHER DDG2P_1_11_2019.csv file, required."
     )
     parser.add_argument(
         '-f1',
@@ -321,67 +374,75 @@ if __name__ == "__main__":
     start_time = time.time()
 
     hpoa_path = verify_input_path(args.hpoa)
-    xml6_path = verify_input_path(args.xml6)
-    xml4_path = verify_input_path(args.xml4)
-    org2p_path = verify_input_path(args.org2p)
-    orp2g_path = verify_input_path(args.orp2g)
+    orpha6_path = verify_input_path(args.orpha6)
+    orpha4_path = verify_input_path(args.orpha4)
+    hpo_g2p_path = verify_input_path(args.hpog2p)
+    hpo_p2g_path = verify_input_path(args.hpop2g)
     omim_path = verify_input_path(args.omim)
+    omim_morbidmap_path = verify_input_path(args.omim_morbidmap)
     ddg2p_path = verify_input_path(args.ddg2p)
     fa1_path = verify_input_path(args.fa1)
     fa2_path = verify_input_path(args.fa2)
     fa3_path = verify_input_path(args.fa3)
     print(
-        f'Processing: {hpoa_path.name}, {xml6_path.name}, {xml4_path.name}, {org2p_path.name}, {orp2g_path.name}, {omim_path.name}, {ddg2p_path.name}'
+        f'Processing: {hpoa_path.name}, {orpha6_path.name}, {orpha4_path.name}, {hpo_g2p_path.name}, {hpo_p2g_path.name}, {omim_path.name}, {ddg2p_path.name}'
     )
 
-    disorder_phenotype = parse_hpoa(hpoa_path)
-    print('==HPO==')
-    print(f'Disorders: {len(disorder_phenotype)}')
-    phenotype_annotations = [
-        phenotype for disorder in disorder_phenotype
-        for phenotype in disorder_phenotype[disorder]
+    hpo_disorder_phenotype = parse_hpoa(hpoa_path)
+    print('==HPO: {hpoa_path.name}==')
+    # Disorders: 11372
+    print(f'Disorders: {len(hpo_disorder_phenotype)}')
+    hpo_phenotype_annotations = [
+        phenotype for disorder in hpo_disorder_phenotype
+        for phenotype in hpo_disorder_phenotype[disorder]
     ]
-    print(f'Disorder to phenotype annotations: {len(phenotype_annotations)}')
+    # Disorder to phenotype annotations: 190530
     print(
-        f' - IEA (inferred from electronic annotation): {len([a for a in phenotype_annotations if a.evidence == "IEA"])}'
+        f'Disorder to phenotype annotations: {len(hpo_phenotype_annotations)}'
     )
-    print(
-        f' - PCS (published clinical study): {len([a for a in phenotype_annotations if a.evidence == "PCS"])}'
+    print( # IEA (inferred from electronic annotation): 53279
+        f' - IEA (inferred from electronic annotation): {len([a for a in hpo_phenotype_annotations if a.evidence == "IEA"])}'
     )
-    print(
-        f' - ICE (individual clinical experience): {len([a for a in phenotype_annotations if a.evidence == "ICE"])}'
+    print( # PCS (published clinical study): 9724
+        f' - PCS (published clinical study): {len([a for a in hpo_phenotype_annotations if a.evidence == "PCS"])}'
     )
-    print(
-        f' - TAS (traceable author statement): {len([a for a in phenotype_annotations if a.evidence == "TAS"])}'
+    print( # ICE (individual clinical experience): 0
+        f' - ICE (individual clinical experience): {len([a for a in hpo_phenotype_annotations if a.evidence == "ICE"])}'
     )
-    print(
-        f' - evidence list: {set([a.evidence for a in phenotype_annotations])}'
+    print( # TAS (traceable author statement): 127527
+        f' - TAS (traceable author statement): {len([a for a in hpo_phenotype_annotations if a.evidence == "TAS"])}'
     )
-    hpo_decipher_disorders = set(
+    print( # evidence list: {'IEA', 'TAS', 'PCS'}
+        f' - evidence list: {set([a.evidence for a in hpo_phenotype_annotations])}'
+    )
+    hpo_decipher_disorder_phenotype = set(
         [
             d.split(':')[1]
-            for d in disorder_phenotype if d.split(':')[0] == 'DECIPHER'
+            for d in hpo_disorder_phenotype if d.split(':')[0] == 'DECIPHER'
         ]
     )
-    hpo_omim_disorders = set(
+    hpo_omim_disorder_phenotype = set(
         [
             d.split(':')[1]
-            for d in disorder_phenotype if d.split(':')[0] == 'OMIM'
+            for d in hpo_disorder_phenotype if d.split(':')[0] == 'OMIM'
         ]
     )
-    hpo_orpha_disorders = set(
+    hpo_orpha_disorder_phenotype = set(
         [
             d.split(':')[1]
-            for d in disorder_phenotype if d.split(':')[0] == 'ORPHA'
+            for d in hpo_disorder_phenotype if d.split(':')[0] == 'ORPHA'
         ]
     )
-    print(f' - decipher disorders: {len(hpo_decipher_disorders)}')
-    print(f' - omim disorders: {len(hpo_omim_disorders)}')
-    print(f' - orpha disorders: {len(hpo_orpha_disorders)}')
+    print(f' - decipher disorders: {len(hpo_decipher_disorder_phenotype)}')
+    print(f' - omim disorders: {len(hpo_omim_disorder_phenotype)}')
+    print(f' - orpha disorders: {len(hpo_orpha_disorder_phenotype)}')
+    # - decipher disorders: 47
+    # - omim disorders: 7623
+    # - orpha disorders: 3702
 
     print('')
-    orpha_gene = parse_orpha_gene_xml(xml6_path)
-    print('==ORPHA_GENE==')
+    print('==ORPHA_GENE: {orpha6_path.name}==')
+    orpha_gene = parse_orpha_gene_xml(orpha6_path)
     print(f'Disorders: {len(orpha_gene)}')
     gene_annotations = [
         gene for disorder in orpha_gene for gene in orpha_gene[disorder]
@@ -395,20 +456,15 @@ if __name__ == "__main__":
     )
 
     print('')
-    orpha_phenotype = parse_orpha_phenotype_xml(xml4_path)
-    print('==ORPHA_HPO==')
+    print('==ORPHA_HPO: {orpha4_path.name}==')
+    orpha_phenotype = parse_orpha_phenotype_xml(orpha4_path)
     print(f'Disorders: {len(orpha_phenotype)}')
 
     print('')
-    omim_gene = parse_omim_to_genes(omim_path)
-    print('==OMIM==')
-    print(f'Disorders: {len(omim_gene)}')
-
-    print('')
-    # build gene_phenotype from disorder_phenotype and orpha_gene
+    # build gene_phenotype from hpo_disorder_phenotype and orpha_gene
     hpo_orpha_gene_phenotype = defaultdict(set)
     for orpha in orpha_gene:
-        phenotypes = disorder_phenotype.get(f'ORPHA:{orpha}')
+        phenotypes = hpo_disorder_phenotype.get(f'ORPHA:{orpha}')
         if not phenotypes:
             continue
         phenotypes_set = set([p.hpo for p in phenotypes])
@@ -426,11 +482,21 @@ if __name__ == "__main__":
             gene_symbol = gene['symbol']
             orpha_gene_phenotype[gene_symbol] |= phenotypes
 
-    # build gene_phenotype from disorder_phenotype and omim_gene
+    print('')
+    # print('==OMIM: {omim_path.name}==')
+    # omim_gene = parse_omim_to_genes(omim_path)
+    # print(f'Disorders: {len(omim_gene)}') # 16104
+    print('==OMIM: {omim_morbidmap_path.name}==')
+    omim_gene = parse_omim_morbidmap(omim_morbidmap_path)
+    print(f'Disorders: {len(omim_gene)}')  # 10905
+    print(
+        f'Genes: {len(set([g for o in omim_gene for g in omim_gene[o]]))}'
+    )  # 14280
+    # build gene_phenotype from hpo_disorder_phenotype and omim_gene
     count = 0
     hpo_omim_gene_phenotype = defaultdict(set)
     for omim in omim_gene:
-        phenotypes = disorder_phenotype.get(f'OMIM:{omim}')
+        phenotypes = hpo_disorder_phenotype.get(f'OMIM:{omim}')
         if not phenotypes:
             continue
         count += 1
@@ -439,219 +505,258 @@ if __name__ == "__main__":
             hpo_omim_gene_phenotype[gene_symbol] |= phenotypes_set
     # print(f'count {count}')
 
-    org2p_gene_phenotype = parse_hpo_genes_to_phenotype(org2p_path)
-    orp2g_gene_phenotype = parse_hpo_phenotype_to_genes(orp2g_path)
+    hpo_g2p_gene_phenotype = parse_hpo_genes_to_phenotype(hpo_g2p_path)
+    hpo_p2g_gene_phenotype = parse_hpo_phenotype_to_genes(hpo_p2g_path)
     decipher_gene_phenotype = parse_decipher_ddg2p(ddg2p_path)
-    print('==HPO_ORPHA_G2P==')
-    print(f'Genes: {len(org2p_gene_phenotype)}')
-    print('==HPO_ORPHA_P2G==')
-    print(f'Genes: {len(orp2g_gene_phenotype)}')
+    print('==HPO_G2P==')
+    print(f'Genes: {len(hpo_g2p_gene_phenotype)}')  # 4231
+    print('==HPO_P2G==')
+    print(f'Genes: {len(hpo_p2g_gene_phenotype)}')  # 4231
     print('==HPO_ORPHA==')
-    print(f'Genes: {len(hpo_orpha_gene_phenotype)}')
+    print(f'Genes: {len(hpo_orpha_gene_phenotype)}')  # 2730
     print('==ORPHA==')
-    print(f'Genes: {len(orpha_gene_phenotype)}')
-    print('==OMIM==')
-    print(f'Genes: {len(hpo_omim_gene_phenotype)}')
+    print(f'Genes: {len(orpha_gene_phenotype)}')  # 2763
+    print('==HPO_OMIM==')
+    print(f'Genes: {len(hpo_omim_gene_phenotype)}')  # 23 -> 13003
     print('==DECIPHER==')
-    print(f'Genes: {len(decipher_gene_phenotype)}')
-    print_set_stats(
-        'ORPHA|HPO_ORPHA|HPO_ORPHA_G2P',
-        set(
-            orpha_gene_phenotype
-        ) | set(
-            hpo_orpha_gene_phenotype
-        ) | set(
-            org2p_gene_phenotype
-        ), 'DECIPHER',
-        set(
-            decipher_gene_phenotype
-        )
+    print(f'Genes: {len(decipher_gene_phenotype)}')  # 1370
+    # print_set_stats(
+    #     'ORPHA|HPO_ORPHA|HPO_G2P',
+    #     set(
+    #         orpha_gene_phenotype
+    #     ) | set(
+    #         hpo_orpha_gene_phenotype
+    #     ) | set(
+    #         hpo_g2p_gene_phenotype
+    #     ), 'DECIPHER',
+    #     set(
+    #         decipher_gene_phenotype
+    #     )
+    # )
+    hpo_omim_gene_phenotype_set = set(
+        [
+            (g, p) for g in hpo_omim_gene_phenotype
+            for p in hpo_omim_gene_phenotype[g]
+        ]
     )
-
-    print('')
-    print('==SET STATS==')
-    print_set_stats(
-        'HPO_ORPHA', hpo_orpha_disorders, 'ORPHA_GENE', set(orpha_gene)
+    hpo_g2p_gene_phenotype_set = set(
+        [
+            (g, p) for g in hpo_g2p_gene_phenotype
+            for p in hpo_g2p_gene_phenotype[g]
+        ]
     )
-    print_set_stats(
-        'HPO_ORPHA', hpo_orpha_disorders, 'ORPHA_HPO', set(orpha_phenotype)
+    orpha_gene_phenotype_set = set(
+        [(g, p) for g in orpha_gene_phenotype for p in orpha_gene_phenotype[g]]
     )
-    print_set_stats('HPO_OMIM', hpo_omim_disorders, 'OMIM_GENE', set(omim_gene))
-    print_set_stats(
-        'HPO_ORPHA_G2P',
-        set(
-            [
-                (g, p) for g in org2p_gene_phenotype
-                for p in org2p_gene_phenotype[g]
-            ]
-        ), 'HPO_ORPHA_P2G',
-        set(
-            [
-                (g, p) for g in orp2g_gene_phenotype
-                for p in orp2g_gene_phenotype[g]
-            ]
-        )
+    hpo_orpha_gene_phenotype_set = set(
+        [
+            (g, p) for g in hpo_orpha_gene_phenotype
+            for p in hpo_orpha_gene_phenotype[g]
+        ]
     )
-    print_set_stats(
-        'HPO_ORPHA',
-        set(
-            [
-                (g, p) for g in hpo_orpha_gene_phenotype
-                for p in hpo_orpha_gene_phenotype[g]
-            ]
-        ), 'ORPHA',
-        set(
-            [
-                (g, p) for g in orpha_gene_phenotype
-                for p in orpha_gene_phenotype[g]
-            ]
-        )
+    decipher_gene_phenotype_set = set(
+        [
+            (g, p) for g in decipher_gene_phenotype
+            for p in decipher_gene_phenotype[g]
+        ]
     )
     print_set_stats(
-        'HPO_ORPHA',
-        set(
-            [
-                (g, p) for g in hpo_orpha_gene_phenotype
-                for p in hpo_orpha_gene_phenotype[g]
-            ]
-        ), 'HPO_ORPHA_G2P',
-        set(
-            [
-                (g, p) for g in org2p_gene_phenotype
-                for p in org2p_gene_phenotype[g]
-            ]
-        )
+        'HPO_OMIM', hpo_omim_gene_phenotype_set, 'HPO_G2P',
+        hpo_g2p_gene_phenotype_set
     )
+    gene_phenotype_set = hpo_omim_gene_phenotype_set | hpo_g2p_gene_phenotype_set
     print_set_stats(
-        'ORPHA',
-        set(
-            [
-                (g, p) for g in orpha_gene_phenotype
-                for p in orpha_gene_phenotype[g]
-            ]
-        ), 'HPO_ORPHA_G2P',
-        set(
-            [
-                (g, p) for g in org2p_gene_phenotype
-                for p in org2p_gene_phenotype[g]
-            ]
-        )
+        'HPO_OMIM|HPO_G2P', gene_phenotype_set, 'ORPHA',
+        orpha_gene_phenotype_set
     )
+    gene_phenotype_set |= orpha_gene_phenotype_set
     print_set_stats(
-        'ORPHA|HPO_ORPHA',
-        set(
-            [
-                (g, p) for g in orpha_gene_phenotype
-                for p in orpha_gene_phenotype[g]
-            ]
-        ) | set(
-            [
-                (g, p) for g in hpo_orpha_gene_phenotype
-                for p in hpo_orpha_gene_phenotype[g]
-            ]
-        ), 'HPO_ORPHA_G2P',
-        set(
-            [
-                (g, p) for g in org2p_gene_phenotype
-                for p in org2p_gene_phenotype[g]
-            ]
-        )
+        'HPO_OMIM|HPO_G2P|ORPHA', gene_phenotype_set, 'HPO_ORPHA',
+        hpo_orpha_gene_phenotype_set
     )
+    gene_phenotype_set |= hpo_orpha_gene_phenotype_set
     print_set_stats(
-        'ORPHA|HPO_ORPHA|HPO_ORPHA_G2P',
-        set(
-            [
-                (g, p) for g in orpha_gene_phenotype
-                for p in orpha_gene_phenotype[g]
-            ]
-        ) | set(
-            [
-                (g, p) for g in hpo_orpha_gene_phenotype
-                for p in hpo_orpha_gene_phenotype[g]
-            ]
-        ) | set(
-            [
-                (g, p) for g in org2p_gene_phenotype
-                for p in org2p_gene_phenotype[g]
-            ]
-        ), 'DECIPHER',
-        set(
-            [
-                (g, p) for g in decipher_gene_phenotype
-                for p in decipher_gene_phenotype[g]
-            ]
-        )
+        'HPO_OMIM|HPO_G2P|ORPHA|HPO_ORPHA', gene_phenotype_set, 'DECIPHER',
+        decipher_gene_phenotype_set
     )
-    gene_phenotype_set = set(
-            [
-                (g, p) for g in orpha_gene_phenotype
-                for p in orpha_gene_phenotype[g]
-            ]
-        ) | set(
-            [
-                (g, p) for g in hpo_orpha_gene_phenotype
-                for p in hpo_orpha_gene_phenotype[g]
-            ]
-        ) | set(
-            [
-                (g, p) for g in org2p_gene_phenotype
-                for p in org2p_gene_phenotype[g]
-            ]
-        )|set(
-            [
-                (g, p) for g in decipher_gene_phenotype
-                for p in decipher_gene_phenotype[g]
-            ]
-        )
+    gene_phenotype_set |= decipher_gene_phenotype_set
 
     # total number of genes with phenotype annotations
     gene_phenotype = defaultdict(set)
     for g, p in gene_phenotype_set:
-        gene_phenotype[g].add(p)
-    print(f'gene_phenotype Genes: {len(gene_phenotype)}')
+        gene_phenotype[g.upper()].add(p.upper())
+    print(f'gene_phenotype ({len(gene_phenotype_set)})')
+    print(f' - Genes ({len(gene_phenotype)})')
+    print(
+        f' - Phenotypes ({len(set([p for g in gene_phenotype for p in gene_phenotype[g]]))})'
+    )
+    # print(f'{set(gene_phenotype)}')
+
+    # print('')
+    # print('==SET STATS==')
+    # print_set_stats(
+    #     'HPO_ORPHA', hpo_orpha_disorder_phenotype, 'ORPHA_GENE', set(orpha_gene)
+    # )
+    # print_set_stats(
+    #     'HPO_ORPHA', hpo_orpha_disorder_phenotype, 'ORPHA_HPO', set(orpha_phenotype)
+    # )
+    # print_set_stats('HPO_OMIM', hpo_omim_disorder_phenotype, 'OMIM_GENE', set(omim_gene))
+    # print_set_stats(
+    #     'HPO_G2P',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_g2p_gene_phenotype
+    #             for p in hpo_g2p_gene_phenotype[g]
+    #         ]
+    #     ), 'HPO_ORPHA_P2G',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_p2g_gene_phenotype
+    #             for p in hpo_p2g_gene_phenotype[g]
+    #         ]
+    #     )
+    # )
+    # print_set_stats(
+    #     'HPO_ORPHA',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_orpha_gene_phenotype
+    #             for p in hpo_orpha_gene_phenotype[g]
+    #         ]
+    #     ), 'ORPHA',
+    #     set(
+    #         [
+    #             (g, p) for g in orpha_gene_phenotype
+    #             for p in orpha_gene_phenotype[g]
+    #         ]
+    #     )
+    # )
+    # print_set_stats(
+    #     'HPO_ORPHA',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_orpha_gene_phenotype
+    #             for p in hpo_orpha_gene_phenotype[g]
+    #         ]
+    #     ), 'HPO_G2P',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_g2p_gene_phenotype
+    #             for p in hpo_g2p_gene_phenotype[g]
+    #         ]
+    #     )
+    # )
+    # print_set_stats(
+    #     'ORPHA',
+    #     set(
+    #         [
+    #             (g, p) for g in orpha_gene_phenotype
+    #             for p in orpha_gene_phenotype[g]
+    #         ]
+    #     ), 'HPO_G2P',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_g2p_gene_phenotype
+    #             for p in hpo_g2p_gene_phenotype[g]
+    #         ]
+    #     )
+    # )
+    # print_set_stats(
+    #     'ORPHA|HPO_ORPHA',
+    #     set(
+    #         [
+    #             (g, p) for g in orpha_gene_phenotype
+    #             for p in orpha_gene_phenotype[g]
+    #         ]
+    #     ) | set(
+    #         [
+    #             (g, p) for g in hpo_orpha_gene_phenotype
+    #             for p in hpo_orpha_gene_phenotype[g]
+    #         ]
+    #     ), 'HPO_G2P',
+    #     set(
+    #         [
+    #             (g, p) for g in hpo_g2p_gene_phenotype
+    #             for p in hpo_g2p_gene_phenotype[g]
+    #         ]
+    #     )
+    # )
+    # print_set_stats(
+    #     'ORPHA|HPO_ORPHA|HPO_G2P',
+    #     set(
+    #         [
+    #             (g, p) for g in orpha_gene_phenotype
+    #             for p in orpha_gene_phenotype[g]
+    #         ]
+    #     ) | set(
+    #         [
+    #             (g, p) for g in hpo_orpha_gene_phenotype
+    #             for p in hpo_orpha_gene_phenotype[g]
+    #         ]
+    #     ) | set(
+    #         [
+    #             (g, p) for g in hpo_g2p_gene_phenotype
+    #             for p in hpo_g2p_gene_phenotype[g]
+    #         ]
+    #     ), 'DECIPHER',
+    #     set(
+    #         [
+    #             (g, p) for g in decipher_gene_phenotype
+    #             for p in decipher_gene_phenotype[g]
+    #         ]
+    #     )
+    # )
 
     # read sequences
     gene_seq = defaultdict(set)
     index_uniprot_fa(fa3_path, gene_seq, gene_phenotype)
     # make a gene list sorted by number of sequences from most to least
-    gene_list = sorted(gene_seq, key=lambda k: (len(gene_seq[k]), k), reverse=True)
+    gene_list = sorted(
+        gene_seq, key=lambda k: (len(gene_seq[k]), k), reverse=True
+    )
     print(f'{fa3_path.name}')
     print(f'Genes:')
     print(f' - Total: {len(gene_seq)}')
     print(f'Seqs:')
     print(f' - Total: {len(set([s for g in gene_seq for s in gene_seq[g]]))}')
-    print(f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}')
+    print(
+        f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}'
+    )
     index_uniprot_fa(fa2_path, gene_seq, gene_phenotype)
     print(f'+ {fa2_path.name}')
     print(f'Genes:')
     print(f' - Total: {len(gene_seq)}')
     print(f'Seqs:')
     print(f' - Total: {len(set([s for g in gene_seq for s in gene_seq[g]]))}')
-    print(f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}')
+    print(
+        f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}'
+    )
     index_uniprot_fa(fa1_path, gene_seq, gene_phenotype)
     print(f'+ {fa1_path.name}')
     print(f'Genes:')
     print(f' - Total: {len(gene_seq)}')
     print(f'Seqs:')
     print(f' - Total: {len(set([s for g in gene_seq for s in gene_seq[g]]))}')
-    print(f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}')
+    print(
+        f' - Max, Median, Min: {len(gene_seq[gene_list[0]])}, {len(gene_seq[gene_list[len(gene_list)//2]])}, {len(gene_seq[gene_list[-1]])}'
+    )
 
     # list some genes without a protein sequence
     genes_without_sequence = set(gene_phenotype) - set(gene_seq)
-    print(f'Genes without a sequence ({len(genes_without_sequence)}): {genes_without_sequence}')
-    
+    print(
+        f'Genes without a sequence ({len(genes_without_sequence)}): {genes_without_sequence}'
+    )
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
 
 # windows
-# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --xml6 E:\hpo\orpha-20191101\en_product6.xml --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml --org2p E:\hpo\hpo-20191011\annotation\ORPHA_ALL_FREQUENCIES_genes_to_phenotype.txt --orp2g E:\hpo\hpo-20191011\annotation\ORPHA_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv
+# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --orpha6 E:\hpo\orpha-20191101\en_product6.xml --orpha4 E:\hpo\orpha-20191101\en_product4_HPO.xml --hpog2p E:\hpo\hpo-20191011\annotation\ORPHA_ALL_FREQUENCIES_genes_to_phenotype.txt --hpop2g E:\hpo\hpo-20191011\annotation\ORPHA_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv
 
-# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --xml6 E:\hpo\orpha-20191101\en_product6.xml --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml --org2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --orp2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv
+# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --orpha6 E:\hpo\orpha-20191101\en_product6.xml --orpha4 E:\hpo\orpha-20191101\en_product4_HPO.xml --hpog2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --hpop2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv
 
-# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --xml6 E:\hpo\orpha-20191101\en_product6.xml --xml4 E:\hpo\orpha-20191101\en_product4_HPO.xml --org2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --orp2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv --fa1 F:\uniprot\uniprot-20191015\uniprot_trembl.fasta --fa2 F:\uniprot\uniprot-20191015\uniprot_sprot.fasta --fa3 F:\uniprot\uniprot-20191015\uniprot_sprot_varsplic.fasta
+# python -m util.hpo.stats_hpoa --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --orpha6 E:\hpo\orpha-20191101\en_product6.xml --orpha4 E:\hpo\orpha-20191101\en_product4_HPO.xml --hpog2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --hpop2g E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt --omim E:\hpo\omim-20191101\mim2gene.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv --fa1 F:\uniprot\uniprot-20191015\uniprot_trembl.fasta --fa2 F:\uniprot\uniprot-20191015\uniprot_sprot.fasta --fa3 F:\uniprot\uniprot-20191015\uniprot_sprot_varsplic.fasta --omim_morbidmap E:\hpo\omim-20191101\morbidmap.txt
 
-
-# Use ORPHA|HPO_ORPHA|HPO_ORPHA_G2P for Orpha dataset
+# Use ORPHA|HPO_ORPHA|HPO_G2P for Orpha dataset
 
 # Processing: phenotype.hpoa, en_product6.xml, en_product4_HPO.xml, ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt, ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt, mim2gene.txt, DDG2P_1_11_2019.csv
 # ==HPO==
@@ -678,7 +783,7 @@ if __name__ == "__main__":
 # ==OMIM==
 # Disorders: 16104
 
-# ==HPO_ORPHA_G2P==
+# ==HPO_G2P==
 # Genes: 4231
 # ==HPO_ORPHA_P2G==
 # Genes: 4231
@@ -691,13 +796,12 @@ if __name__ == "__main__":
 # ==DECIPHER==
 # Genes: 1370
 
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 4313  (['CAV3', 'FANCE', 'ZDHHC15', 'PTPN1', 'TINF2'])
+# ORPHA|HPO_ORPHA|HPO_G2P: 4313  (['CAV3', 'FANCE', 'ZDHHC15', 'PTPN1', 'TINF2'])
 # DECIPHER: 1370  (['FANCE', 'ZDHHC15', 'MTO1', 'UROC1', 'HPRT1'])
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P & DECIPHER: 1326  (['FANCE', 'ZDHHC15', 'MTO1', 'UROC1', 'HPRT1'])
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P | DECIPHER: 4357  (['CAV3', 'FANCE', 'ZDHHC15', 'PTPN1', 'TINF2'])
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P - DECIPHER: 2987  (['IL2RB', 'CAV3', 'PTPN1', 'TINF2', 'HLA-DQB1'])
-# DECIPHER - ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 44  (['NRXN3', 'C8orf37', 'EPRS', 'APOPT1', 'MED13'])
-
+# ORPHA|HPO_ORPHA|HPO_G2P & DECIPHER: 1326  (['FANCE', 'ZDHHC15', 'MTO1', 'UROC1', 'HPRT1'])
+# ORPHA|HPO_ORPHA|HPO_G2P | DECIPHER: 4357  (['CAV3', 'FANCE', 'ZDHHC15', 'PTPN1', 'TINF2'])
+# ORPHA|HPO_ORPHA|HPO_G2P - DECIPHER: 2987  (['IL2RB', 'CAV3', 'PTPN1', 'TINF2', 'HLA-DQB1'])
+# DECIPHER - ORPHA|HPO_ORPHA|HPO_G2P: 44  (['NRXN3', 'C8orf37', 'EPRS', 'APOPT1', 'MED13'])
 
 # ==SET STATS==
 
@@ -708,14 +812,12 @@ if __name__ == "__main__":
 # HPO_ORPHA - ORPHA_GENE: 1694  (['261476', '99750', '293987', '436003', '85319'])
 # ORPHA_GENE - HPO_ORPHA: 1784  (['79246', '228179', '97234', '276603', '157716'])
 
-
 # HPO_ORPHA: 3702  (['281090', '261476', '99750', '2698', '254361'])
 # ORPHA_HPO: 3771  (['281090', '261476', '99750', '2698', '254361'])
 # HPO_ORPHA & ORPHA_HPO: 3702  (['281090', '261476', '99750', '2698', '254361'])
 # HPO_ORPHA | ORPHA_HPO: 3771  (['281090', '261476', '2698', '254361', '319199'])
 # HPO_ORPHA - ORPHA_HPO: 0  ([])
 # ORPHA_HPO - HPO_ORPHA: 69  (['357001', '247262', '331206', '95455', '275555'])
-
 
 # HPO_OMIM: 7623  (['300310', '120433', '601216', '616562', '136580'])
 # OMIM_GENE: 16104  (['607729', '612377', '604258', '605096', '616254'])
@@ -724,14 +826,12 @@ if __name__ == "__main__":
 # HPO_OMIM - OMIM_GENE: 7600  (['300310', '120433', '601216', '616562', '136580'])
 # OMIM_GENE - HPO_OMIM: 16081  (['607729', '612377', '604258', '605096', '616254'])
 
-
-# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# HPO_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
 # HPO_ORPHA_P2G: 552814  ([('MED25', 'HP:0001263'), ('STAT1', 'HP:0004348'), ('SLC34A3', 'HP:0025031'), ('DPF2', 'HP:0003549'), ('ARCN1', 'HP:0000218')])
-# HPO_ORPHA_G2P & HPO_ORPHA_P2G: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
-# HPO_ORPHA_G2P | HPO_ORPHA_P2G: 552814  ([('MED25', 'HP:0001263'), ('SLC34A3', 'HP:0025031'), ('ARCN1', 'HP:0000218'), ('COX3', 'HP:0025142'), ('SC5D', 'HP:0008428')])
-# HPO_ORPHA_G2P - HPO_ORPHA_P2G: 0  ([])
-# HPO_ORPHA_P2G - HPO_ORPHA_G2P: 391811  ([('STAT1', 'HP:0004348'), ('SLC34A3', 'HP:0025031'), ('DPF2', 'HP:0003549'), ('COX3', 'HP:0025142'), ('SC5D', 'HP:0008428')])
-
+# HPO_G2P & HPO_ORPHA_P2G: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# HPO_G2P | HPO_ORPHA_P2G: 552814  ([('MED25', 'HP:0001263'), ('SLC34A3', 'HP:0025031'), ('ARCN1', 'HP:0000218'), ('COX3', 'HP:0025142'), ('SC5D', 'HP:0008428')])
+# HPO_G2P - HPO_ORPHA_P2G: 0  ([])
+# HPO_ORPHA_P2G - HPO_G2P: 391811  ([('STAT1', 'HP:0004348'), ('SLC34A3', 'HP:0025031'), ('DPF2', 'HP:0003549'), ('COX3', 'HP:0025142'), ('SC5D', 'HP:0008428')])
 
 # HPO_ORPHA: 111511  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
 # ORPHA: 109591  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
@@ -740,37 +840,33 @@ if __name__ == "__main__":
 # HPO_ORPHA - ORPHA: 4761  ([('EDAR', 'HP:0000007'), ('GDF5', 'HP:0000006'), ('SEC24D', 'HP:0000006'), ('DISC1', 'HP:0000007'), ('DPP9', 'HP:0001426')])
 # ORPHA - HPO_ORPHA: 2841  ([('KCNQ1OT1', 'HP:0002564'), ('PIK3CA', 'HP:0100843'), ('PHKG2', 'HP:0001395'), ('KMT2A', 'HP:0007930'), ('PHKA2', 'HP:0002240')])
 
-
 # HPO_ORPHA: 111511  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
-# HPO_ORPHA & HPO_ORPHA_G2P: 98315  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# HPO_ORPHA | HPO_ORPHA_G2P: 174199  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
-# HPO_ORPHA - HPO_ORPHA_G2P: 13196  ([('POLG2', 'HP:0001251'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285'), ('MT-ND4', 'HP:0002076'), ('SUFU', 'HP:0011442')])
-# HPO_ORPHA_G2P - HPO_ORPHA: 62688  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
-
+# HPO_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# HPO_ORPHA & HPO_G2P: 98315  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# HPO_ORPHA | HPO_G2P: 174199  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# HPO_ORPHA - HPO_G2P: 13196  ([('POLG2', 'HP:0001251'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285'), ('MT-ND4', 'HP:0002076'), ('SUFU', 'HP:0011442')])
+# HPO_G2P - HPO_ORPHA: 62688  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
 
 # ORPHA: 109591  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
-# ORPHA & HPO_ORPHA_G2P: 95795  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# ORPHA | HPO_ORPHA_G2P: 174799  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
-# ORPHA - HPO_ORPHA_G2P: 13796  ([('PIK3CA', 'HP:0100843'), ('POLG2', 'HP:0001251'), ('PHKG2', 'HP:0001395'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285')])
-# HPO_ORPHA_G2P - ORPHA: 65208  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
-
+# HPO_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# ORPHA & HPO_G2P: 95795  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA | HPO_G2P: 174799  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# ORPHA - HPO_G2P: 13796  ([('PIK3CA', 'HP:0100843'), ('POLG2', 'HP:0001251'), ('PHKG2', 'HP:0001395'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285')])
+# HPO_G2P - ORPHA: 65208  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
 
 # ORPHA|HPO_ORPHA: 114352  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490'), ('AP4M1', 'HP:0001263')])
-# HPO_ORPHA_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
-# ORPHA|HPO_ORPHA & HPO_ORPHA_G2P: 98663  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# ORPHA|HPO_ORPHA | HPO_ORPHA_G2P: 176692  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
-# ORPHA|HPO_ORPHA - HPO_ORPHA_G2P: 15689  ([('PHKG2', 'HP:0001395'), ('PIK3CA', 'HP:0100843'), ('POLG2', 'HP:0001251'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285')])
-# HPO_ORPHA_G2P - ORPHA|HPO_ORPHA: 62340  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
+# HPO_G2P: 161003  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('FOXG1', 'HP:0100490'), ('SCN4A', 'HP:0002203')])
+# ORPHA|HPO_ORPHA & HPO_G2P: 98663  ([('MED25', 'HP:0001263'), ('KRT14', 'HP:0001053'), ('PRKRA', 'HP:0002451'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA|HPO_ORPHA | HPO_G2P: 176692  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# ORPHA|HPO_ORPHA - HPO_G2P: 15689  ([('PHKG2', 'HP:0001395'), ('PIK3CA', 'HP:0100843'), ('POLG2', 'HP:0001251'), ('PUF60', 'HP:0040019'), ('MT-ATP6', 'HP:0001285')])
+# HPO_G2P - ORPHA|HPO_ORPHA: 62340  ([('CANT1', 'HP:0004233'), ('PTS', 'HP:0000737'), ('MATN3', 'HP:0002983'), ('CRYAA', 'HP:0000568'), ('ALDH18A1', 'HP:0001328')])
 
-
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 176692  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
+# ORPHA|HPO_ORPHA|HPO_G2P: 176692  ([('MED25', 'HP:0001263'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('IL10', 'HP:0001289'), ('VPS13C', 'HP:0001268')])
 # DECIPHER: 28710  ([('BMP4', 'HP:0000202'), ('PTS', 'HP:0000737'), ('ALDH18A1', 'HP:0001328'), ('RAPSN', 'HP:0001260'), ('SRD5A3', 'HP:0000007')])
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P & DECIPHER: 24992  ([('BMP4', 'HP:0000202'), ('PTS', 'HP:0000737'), ('ALDH18A1', 'HP:0001328'), ('SRD5A3', 'HP:0000007'), ('FTO', 'HP:0001276')])
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P | DECIPHER: 180410  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# ORPHA|HPO_ORPHA|HPO_ORPHA_G2P - DECIPHER: 151700  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
-# DECIPHER - ORPHA|HPO_ORPHA|HPO_ORPHA_G2P: 3718  ([('GJA1', 'HP:0006482'), ('SMARCA4', 'HP:0003083'), ('GJA1', 'HP:0002645'), ('TTC8', 'HP:0001773'), ('RPGRIP1L', 'HP:0000272')])
+# ORPHA|HPO_ORPHA|HPO_G2P & DECIPHER: 24992  ([('BMP4', 'HP:0000202'), ('PTS', 'HP:0000737'), ('ALDH18A1', 'HP:0001328'), ('SRD5A3', 'HP:0000007'), ('FTO', 'HP:0001276')])
+# ORPHA|HPO_ORPHA|HPO_G2P | DECIPHER: 180410  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# ORPHA|HPO_ORPHA|HPO_G2P - DECIPHER: 151700  ([('MED25', 'HP:0001263'), ('PRKRA', 'HP:0002451'), ('ARCN1', 'HP:0000218'), ('SCN4A', 'HP:0002203'), ('FOXG1', 'HP:0100490')])
+# DECIPHER - ORPHA|HPO_ORPHA|HPO_G2P: 3718  ([('GJA1', 'HP:0006482'), ('SMARCA4', 'HP:0003083'), ('GJA1', 'HP:0002645'), ('TTC8', 'HP:0001773'), ('RPGRIP1L', 'HP:0000272')])
 
 # gene_phenotype Genes: 4357
 # uniprot_sprot_varsplic.fasta
@@ -779,14 +875,14 @@ if __name__ == "__main__":
 # Seqs:
 #  - Total: 6836
 #  - Max, Median, Min: 40, 2, 1
-# uniprot_sprot.fasta: 100%|###########################################################################################################################################################################################################################################################################################################################| 277017792/277017792 [00:07<00:00, 38662486.39bytes/s] 
+# uniprot_sprot.fasta: 100%|###########################################################################################################################################################################################################################################################################################################################| 277017792/277017792 [00:07<00:00, 38662486.39bytes/s]
 # + uniprot_sprot.fasta
 # Genes:
 #  - Total: 4235
 # Seqs:
 #  - Total: 23024
 #  - Max, Median, Min: 44, 3, 2
-# uniprot_trembl.fasta.gz: 100%|###################################################################################################################################################################################################################################################################################################################| 80312776613/80312776613 [49:11<00:00, 27209386.06bytes/s] 
+# uniprot_trembl.fasta.gz: 100%|###################################################################################################################################################################################################################################################################################################################| 80312776613/80312776613 [49:11<00:00, 27209386.06bytes/s]
 # + uniprot_trembl.fasta.gz
 # Genes:
 #  - Total: 4248

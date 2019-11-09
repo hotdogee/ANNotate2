@@ -118,7 +118,7 @@ def _gzip_size(path):
         return struct.unpack('I', f.read(4))[0]
 
 
-def stats_uniprot_dat(path):
+def parse_uniprot_dat(path):
     path = Path(path)
     # if gzipped
     target = os.path.getsize(path)
@@ -152,7 +152,7 @@ def stats_uniprot_dat(path):
             if line.strip() == '':
                 continue
             # termination
-            if lc == '//':
+            if lc == '//':  # last entry has termination
                 count[lc] += 1
                 # check overlapping features
                 for i in range(len(entry['FT'])):
