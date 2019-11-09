@@ -225,7 +225,7 @@ def serving_predict_fasta(
 # python ./util/pfam/run_batch_serving.py --indir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains_fa_split_batched_25000/pfam31_1567787563_results_raw --workers 2 --server http://localhost:8501/v1/models/pfam:predict
 # Runtime: 3369.25 s
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Submit each FASTA file in the input directory as a batch to an ANNotate server.'

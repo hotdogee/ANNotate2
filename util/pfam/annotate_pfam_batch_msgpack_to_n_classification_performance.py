@@ -226,7 +226,7 @@ def collect_seq_domains(output_queue, return_proxy):
     return_proxy['pred_set'] = pred_set
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     # goal: examine the effect on recall after adding 2ed and 3rd classes
     parser = argparse.ArgumentParser(
         description=

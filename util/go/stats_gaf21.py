@@ -129,7 +129,7 @@ tax: {len(vocab['tax'])}
     )
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Print some statistics of the GO .gaf.gz file.'
     )

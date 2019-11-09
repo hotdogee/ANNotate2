@@ -206,7 +206,7 @@ def output_worker(output_queue):
 # W2125
 # python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/run_batch_predictor.py --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000 --outdir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_25000/pfam31_1567787530_results_raw --modeldir /home/hotdogee/models/pfam2/1567787530 --devices 0,1,2,3 --writers 4
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Run ANNotate prediction locally on each FASTA file in the input directory.'

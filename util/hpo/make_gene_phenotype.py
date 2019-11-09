@@ -287,7 +287,7 @@ def index_uniprot_fa(path, gene_seq, whitelist):
     return
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Print some statistics of the HPO phenotype.hpoa and orpha en_product6.xml file.'

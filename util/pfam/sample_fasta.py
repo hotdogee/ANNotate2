@@ -146,7 +146,7 @@ def verify_output_path(p):
 # Batch: 1500
 # /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/run/predict/20190913-p32-n1000/run_p32_n100000.sh
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Sample N sequences from a FASTA file.'
     )

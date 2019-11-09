@@ -125,7 +125,7 @@ def verify_input_or_dir_path(p):
     return path
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Compute pfam_scan.pl performance metrics.'
     )

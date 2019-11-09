@@ -247,7 +247,7 @@ def tsv_writer(output_queue, output_path, meta_path):
     logging.info(f"Output Exit")
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Convert ANNotate Pfam msgpack output directory to Pfam regions TSV file.'

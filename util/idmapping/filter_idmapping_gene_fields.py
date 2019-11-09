@@ -93,7 +93,7 @@ def filter_idmapping_gene_fields(path, output_path):
     return lines_in, lines_out
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Filter idmapping Gene_* fields.'
     )

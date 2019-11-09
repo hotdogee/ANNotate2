@@ -142,7 +142,7 @@ def verify_output_path(p):
 # >Z9K8E8.1 Z9K8E8_9GAMM Uncharacterized protein {ECO:0000313|EMBL:EWS99547.1} (Fragment)
 # GAVFYALVRTFADLVSDNRDEVIAKHFKLIHRLLFWLDWLPARITSFGYLVIGNFNKGTSCWLHYVFDFSSPNHKVVTYTALAAEQVEERYYGCTFESLLV
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Output non overlapping regions data tsv and fa files.'
     )

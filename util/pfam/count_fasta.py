@@ -92,7 +92,7 @@ def verify_input_path(p):
 # python ./util/pfam/count_fasta.py --input /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.fa
 # python ./util/pfam/count_fasta.py --input /home/hotdogee/pfam/p31_seqs_with_p32_regions_of_p31_domains.fa
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Print the number of sequences in a FASTA file.'
     )

@@ -64,7 +64,7 @@ def get_idmapping_types(path):
     return id_types
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(description='Print idmapping types.')
     parser.add_argument(
         '-d',

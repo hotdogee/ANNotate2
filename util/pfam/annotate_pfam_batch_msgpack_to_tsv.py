@@ -199,7 +199,7 @@ def msgpack_to_tsv(path, min_region_length=5):
 
 # python ./util/pfam/annotate_pfam_batch_msgpack_to_tsv.py  --indir /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_batched_34000/pfam31_1567889661_results_raw --meta /home/hotdogee/pfam/pfam-regions-d0-s0-meta.json --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.ann31_1567889661_results.tsv --workers 4
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Convert ANNotate Pfam msgpack output directory to Pfam regions TSV file.'

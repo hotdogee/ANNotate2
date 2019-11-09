@@ -109,7 +109,7 @@ def verify_output_path(p):
 # windows
 # python .\util\pfam\split_fasta.py --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.fa --outdir D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2_fa_split_distributed -num 200 --mode distributed
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Split a FASTA file into N files.'
     )

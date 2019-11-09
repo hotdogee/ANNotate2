@@ -159,7 +159,7 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
     )
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Check if we can find all the seqids in the GO gaf file in the uniprot fasta file.'

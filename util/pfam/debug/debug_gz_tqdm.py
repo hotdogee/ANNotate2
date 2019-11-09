@@ -59,7 +59,7 @@ def verify_input_path(p):
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path)
     return path
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Test.')
     parser.add_argument('-1', '--tsv1', type=str, required=True,

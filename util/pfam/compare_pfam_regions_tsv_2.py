@@ -97,7 +97,7 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
 {n2} - {n1}: {len(s2 - s1)} {unit}
 ''')
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Obtain new regions of old domains on old sequences.')
     parser.add_argument('-1', '--tsv1', type=str, required=True,

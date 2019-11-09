@@ -302,7 +302,7 @@ def collect_seq_domains(output_queue, output_path):
         logging.info(f"Total seq {i}")
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     # goal: examine the effect on recall after adding 2ed and 3rd classes
     parser = argparse.ArgumentParser(
         description='Compute per sequence performance metrics.'

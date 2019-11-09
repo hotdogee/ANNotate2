@@ -66,7 +66,7 @@ def parse_mmcif(path):
             # SECONDARY
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Compares the contents of mmCIF and PDB directories.')
     parser.add_argument('-m', '--mmcif', type=str, required=True,

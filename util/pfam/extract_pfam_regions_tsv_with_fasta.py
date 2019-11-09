@@ -102,7 +102,7 @@ def verify_output_path(p):
 # fix last seq bug
 # python .\util\pfam\extract_pfam_regions_tsv_with_fasta.py  --fasta D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.n100.fa.gz --input D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains.all_regions.tsv --output D:/pfam/Pfam32.0/p32_seqs_with_p32_regions_of_p31_domains_2.all_regions.n100.tsv.gz
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Extract pfam regions for sequences in a FASTA file.'
     )

@@ -37,7 +37,7 @@ def serving_predict_fasta(i):
 # windows
 # python .\util\pfam\test_concurrent.py --workers 1
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Run ANNotate prediction locally on each FASTA file in the input directory.'

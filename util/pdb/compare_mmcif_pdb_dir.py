@@ -8,7 +8,7 @@ from pathlib import Path
 # windows
 # python .\util\pdb\compare_mmcif_pdb_dir.py --mmcif D:/pdb/mmCIF-20190208 --pdb D:/pdb/pdb-20190209
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Parse a single mmCIF file.')
     parser.add_argument('-m', '--mmcif', type=str, default=r'~/pdb/mmCIF',

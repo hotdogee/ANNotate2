@@ -152,7 +152,7 @@ def verify_output_path(p):
 # runtime: OOM (1950X)
 # /usr/bin/time -v -o test.p31_results.tsv.time /opt/PfamScan/pfam_scan.pl -fasta test.fa -dir ./ -outfile ./test.p31_results.tsv
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Output old and new data tsv and fa files.'
     )

@@ -319,7 +319,7 @@ def get_gene_symbol_mapping(path):
     # return gene_symbol_mapping, gene_type_mapping
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Generate gene_symbol_mapping.json from gene_info[.gz].'
     )

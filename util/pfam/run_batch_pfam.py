@@ -126,7 +126,7 @@ def verify_outdir_path(p, required_empty=True):
     return path
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Run pfam_scan.pl on each FASTA file in the input directory.'
     )

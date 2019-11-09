@@ -311,7 +311,7 @@ def tsv_writer(output_queue, output_path, meta_path):
 # v1: implementation with concurrent.futures.ThreadPoolExecutor
 # v2: speed improvement, implementation with multiprocessing.Process
 # v3: new scoring algorithm
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Convert ANNotate Pfam msgpack output directory to Pfam regions TSV file v3 with scores.'

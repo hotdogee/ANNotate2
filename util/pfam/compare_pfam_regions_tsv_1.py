@@ -109,7 +109,7 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
     )
 
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description=
         'Print the differences of two Pfam-A.regions.uniprot.tsv.gz files.'

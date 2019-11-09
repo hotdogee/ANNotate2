@@ -165,7 +165,7 @@ def verify_output_path(p, can_exist=False):
 
 # /home/hotdogee/venv/tf37/bin/python /home/hotdogee/Dropbox/Work/Btools/ANNotate/ANNotate2/util/pfam/compute_annotate_pfam_classification_performance.py  --pred /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000.ann31_${VERSION}_results.tsv --ans /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains.all_regions.n10000.tsv --fasta /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2.n10000.fa --output /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000.ann31_${VERSION}_results.all_regions_perf.json --outtsv /home/hotdogee/pfam/p32_seqs_with_p32_regions_of_p31_domains_2_n10000.ann31_results.all_regions_perf.tsv
 
-if __name__ == "__main__":
+if __name__ =='__main__':
     parser = argparse.ArgumentParser(
         description='Compute ANNotate Pfam performance metrics.'
     )
