@@ -126,36 +126,36 @@ def verify_output_path(p):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Build GO training dataset.')
+    parser = argparse.ArgumentParser(description='Build HPO training dataset.')
     parser.register('type', 'bool', lambda v: v.lower() == 'true')
     parser.register('type', 'list', lambda v: ast.literal_eval(v))
     parser.add_argument(
-        '-1',
-        '--gaf1',
+        '-g',
+        '--gene_acc_phenotype',
         type=str,
         required=True,
-        help="Path to the GO gaf file, required."
+        help="Path to gene_acc_phenotype.json file, required."
     )
     parser.add_argument(
-        '-2',
-        '--fa2',
+        '-svf',
+        '--sprot_varsplic_fa',
         type=str,
         required=True,
-        help="Path to the uniprot trembl fasta file, required."
+        help="Path to uniprot_sprot_varsplic.fasta[.gz] file, required."
     )
     parser.add_argument(
-        '-3',
-        '--fa3',
+        '-sf',
+        '--sprot_fa',
         type=str,
         required=True,
-        help="Path to the uniprot sprot fasta file, required."
+        help="Path to uniprot_sprot.fasta[.gz] file, required."
     )
     parser.add_argument(
-        '-4',
-        '--fa4',
+        '-tf',
+        '--trembl_fa',
         type=str,
         required=True,
-        help="Path to the uniprot sprot_varsplic fasta file, required."
+        help="Path to uniprot_trembl.fasta[.gz] file, required."
     )
     parser.add_argument(
         '-m',
@@ -179,23 +179,43 @@ if __name__ == "__main__":
         help='Type of label to output'
     )
     parser.add_argument(
-        '--ignore_iea',
-        type='bool',
-        default='True',
-        help='Do not include annotations with evidence type of IEA (Inferred from Electronic Annotation).'
+        '--train_split',
+        type=int,
+        default=5,
+        help='Split training dataset into multiple tfrecords.'
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
-    gaf1_path = verify_input_path(args.gaf1)
-    fa2_path = verify_input_path(args.fa2)
-    fa3_path = verify_input_path(args.fa3)
-    fa4_path = verify_input_path(args.fa4)
+    gene_acc_phenotype_path = verify_input_path(args.gene_acc_phenotype)
+    sprot_varsplic_fa_path = verify_input_path(args.sprot_varsplic_fa)
+    sprot_fa_path = verify_input_path(args.sprot_fa)
+    trembl_fa_path = verify_input_path(args.trembl_fa)
     meta_path = verify_output_path(args.meta)
     train_path = verify_output_path(args.train)
     print(
-        f'Building from {gaf1_path.name}, {fa2_path.name}, {fa3_path.name} and {fa4_path.name}'
+        f'Building from {gene_acc_phenotype_path.name}, {sprot_varsplic_fa_path.name}, {sprot_fa_path.name} and {trembl_fa_path.name}'
     )
+
+    with gene_acc_phenotype_path.open(mode='r', encoding='utf-8') as f:
+        gene_acc_phenotype = json.load(f)
+
+    train_gene_acc = gene_acc_phenotype['train_gene_acc']
+    train_phenotype_acc = gene_acc_phenotype['train_phenotype_acc']
+    test_gene_acc = gene_acc_phenotype['test_gene_acc']
+    test_phenotype_acc = gene_acc_phenotype['test_phenotype_acc']
+
+    # split training
+    train_phenotype_list = sorted(
+        train_phenotype_acc, key=lambda k: (len(train_phenotype_acc[k]), k)
+    )
+    acc_lists = [[]] * args.train_split
+    acc_set = set()
+    for p in train_phenotype_list:
+        for a in train_phenotype_acc[p]:
+            if a not in acc_set:
+                acc_lists[len(acc_set)%args.train_split].append(a)
+                acc_set.add(a)
 
     path = gaf1_path
     # if gzipped

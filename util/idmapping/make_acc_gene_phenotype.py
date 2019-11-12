@@ -274,6 +274,113 @@ def parse_uniprot_dat(path):
 # >tr|Q6SEJ2|Q6SEJ2_9EURY Methyl-coenzyme M reductase alpha subunit (Fragment) OS=uncultured euryarchaeote OX=114243 GN=mcrA PE=4 SV=1
 # >tr|A0A2Z5PNA5|A0A2Z5PNA5_METMI Biotin synthase OS=Methanococcus maripaludis KA1 OX=637914 GN=bioB PE=3 SV=1
 
+def parse_uniprot_fa_acc_gene_len(path):
+    # initialize
+    header_count = 0
+    line_num = 0
+    seq = ''
+    parse_gene_symbol = re.compile(r'^.+?GN=([^= ]+)')
+    # output
+    acc_gene = defaultdict(set)
+    acc_len = defaultdict(int)
+    # if gzipped
+    target = os.path.getsize(path)
+    if path.suffix == '.gz':
+        f = gzip.open(path, mode='rt', encoding='utf-8')
+        target = _gzip_size(path)
+        while target < os.path.getsize(path):
+            # the uncompressed size can't be smaller than the compressed size, so add 4GB
+            target += 2**32
+    else:
+        f = path.open(mode='r', encoding='utf-8')
+    with f, tqdm(
+        total=target,
+        dynamic_ncols=True,
+        ascii=True,
+        smoothing=0.01,
+        desc=path.name,
+        unit='B',
+        unit_scale=True,
+        unit_divisor=1024
+    ) as t:
+        for line in f:
+            t.update(len(line))
+            if t.n > t.total:
+                t.total += 2**32
+            line_num += 1
+            # empty line
+            line = line.strip()
+            if len(line) > 0 and line[0] == '>':
+                header_count += 1
+                # parse header
+                seq_id = line.split()[0][1:]
+                tokens = seq_id.split('|')
+                acc = tokens[1].strip()
+                # DB_Object_Symbol = GN=GeneName
+                match = parse_gene_symbol.match(line)
+                if match:
+                    acc_gene[acc].add(match.group(1))
+                else:
+                    acc_gene[acc]
+                if seq:
+                    acc_len[acc] = len(seq)
+                    seq = ''
+            else:
+                seq += line
+        if seq:
+            acc_len[acc] = len(seq)
+    # print(f'===DEBUG: assert {len(acc_gene)} == {header_count}')
+    return acc_gene, acc_len
+
+def parse_uniprot_fa_acc_gene(path):
+    # initialize
+    header_count = 0
+    line_num = 0
+    parse_gene_symbol = re.compile(r'^.+?GN=([^= ]+)')
+    # output
+    acc_gene = defaultdict(set)
+    # if gzipped
+    target = os.path.getsize(path)
+    if path.suffix == '.gz':
+        f = gzip.open(path, mode='rt', encoding='utf-8')
+        target = _gzip_size(path)
+        while target < os.path.getsize(path):
+            # the uncompressed size can't be smaller than the compressed size, so add 4GB
+            target += 2**32
+    else:
+        f = path.open(mode='r', encoding='utf-8')
+    with f, tqdm(
+        total=target,
+        dynamic_ncols=True,
+        ascii=True,
+        smoothing=0.01,
+        desc=path.name,
+        unit='B',
+        unit_scale=True,
+        unit_divisor=1024
+    ) as t:
+        for line in f:
+            t.update(len(line))
+            if t.n > t.total:
+                t.total += 2**32
+            line_num += 1
+            # empty line
+            line = line.strip()
+            if len(line) > 0 and line[0] == '>':
+                header_count += 1
+                # parse header
+                seq_id = line.split()[0][1:]
+                tokens = seq_id.split('|')
+                acc = tokens[1].strip()
+                # DB_Object_Symbol = GN=GeneName
+                match = parse_gene_symbol.match(line)
+                if match:
+                    acc_gene[acc].add(match.group(1))
+                else:
+                    acc_gene[acc]
+    # print(f'===DEBUG: assert {len(acc_gene)} == {header_count}')
+    return acc_gene
+
 def parse_uniprot_fa_acc_set(path):
     # initialize
     header_count = 0
@@ -312,7 +419,7 @@ def parse_uniprot_fa_acc_set(path):
                 seq_id = line.split()[0][1:]
                 tokens = seq_id.split('|')
                 acc_vocab.add(tokens[1].strip())
-    print(f'===DEBUG: assert {len(acc_vocab)} == {header_count}')
+    # print(f'===DEBUG: assert {len(acc_vocab)} == {header_count}')
     return acc_vocab
 
 
@@ -327,6 +434,30 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
 {n2} - {n1}: {len(s2 - s1)} {unit} ({list(s2 - s1)[:5]})
 '''
     )
+
+
+def print_dict_set_stats(dict_set, dict_name, key_name, value_name):
+    dict_set_list = sorted(
+        dict_set, key=lambda k: (len(dict_set[k]), k)
+    )
+    reversed_dict_set = defaultdict(set)
+    for k in dict_set:
+        for v in dict_set[k]:
+            reversed_dict_set[v].add(k)
+    reversed_dict_set_list = sorted(
+        reversed_dict_set, key=lambda k: (len(reversed_dict_set[k]), k)
+    )
+    print(
+        f'''=== {dict_name} ===
+ - {key_name}s: {len(dict_set)}
+ - {value_name}s: {len(reversed_dict_set)}
+ - {value_name}s per {key_name}: (Min, Median, Max): {len(dict_set[dict_set_list[0]])}, {len(dict_set[dict_set_list[len(dict_set_list)//2]])}, {len(dict_set[dict_set_list[-1]])}
+ - {key_name}s per {value_name}: (Min, Median, Max): {len(reversed_dict_set[reversed_dict_set_list[0]])}, {len(reversed_dict_set[reversed_dict_set_list[len(reversed_dict_set_list)//2]])}, {len(reversed_dict_set[reversed_dict_set_list[-1]])}
+'''
+    )
+    del dict_set_list
+    del reversed_dict_set
+    del reversed_dict_set_list
 
 if __name__ =='__main__':
     parser = argparse.ArgumentParser(description='Print idmapping types.')
@@ -398,32 +529,43 @@ if __name__ =='__main__':
         '--sprot_fa_cache',
         type=str,
         required=True,
-        help="Path to sprot_fa_acc.json file, required."
+        help="Path to sprot_fa_acc_gene_len.json file, required."
     )
     parser.add_argument(
         '-tfc',
         '--trembl_fa_cache',
         type=str,
         required=True,
-        help="Path to trembl_fa_acc.json file, required."
+        help="Path to trembl_fa_acc_gene_len.json file, required."
+    )
+    parser.add_argument(
+        '-gp',
+        '--gene_phenotype',
+        type=str,
+        required=True,
+        help="Path to hpo-20191011-gene-phenotype.json file, required."
     )
     parser.add_argument(
         '-o',
         '--out',
         type=str,
         required=True,
-        help="Path to gene_acc.json file, required."
+        help="Path to gene_acc_phenotype.json file, required."
     )
     args, unparsed = parser.parse_known_args()
     start_time = time.time()
 
+    gene_phenotype_path = verify_input_path(args.gene_phenotype)
     idmapping_path = verify_input_path(args.idmapping)
     sprot_path = verify_input_path(args.sprot)
     trembl_path = verify_input_path(args.trembl)
     sprot_varsplic_fa_path = verify_input_path(args.sprot_varsplic_fa)
     sprot_fa_path = verify_input_path(args.sprot_fa)
     trembl_fa_path = verify_input_path(args.trembl_fa)
-    print(f'Processing: {idmapping_path.name}, {sprot_path.name}, {trembl_path.name}, {sprot_varsplic_fa_path.name}, {sprot_fa_path.name}, {trembl_fa_path.name}')
+    print(f'Processing: {gene_phenotype_path.name}, {idmapping_path.name}, {sprot_path.name}, {trembl_path.name}, {sprot_varsplic_fa_path.name}, {sprot_fa_path.name}, {trembl_fa_path.name}')
+
+    with gene_phenotype_path.open(mode='r', encoding='utf-8') as f:
+        gene_phenotype = json.load(f)
 
     # explore_unfound_genes(idmapping_path, target=232575355)
     if Path(os.path.abspath(os.path.expanduser(args.idmapping_cache))).exists():
@@ -442,7 +584,7 @@ if __name__ =='__main__':
                 indent=2,
                 sort_keys=True
             )
-            
+
     if Path(os.path.abspath(os.path.expanduser(args.sprot_cache))).exists():
         sprot_cache_path = verify_input_path(args.sprot_cache)
         print(f'Loading from CACHE: {sprot_cache_path.name}')
@@ -459,7 +601,7 @@ if __name__ =='__main__':
                 indent=2,
                 sort_keys=True
             )
-    
+
     if Path(os.path.abspath(os.path.expanduser(args.trembl_cache))).exists():
         trembl_cache_path = verify_input_path(args.trembl_cache)
         print(f'Loading from CACHE: {trembl_cache_path.name}')
@@ -479,467 +621,343 @@ if __name__ =='__main__':
 
     # acc with seq
     print(f'Loading from SOURCE: {sprot_varsplic_fa_path.name}')
-    sprot_varsplic_fa_accs = parse_uniprot_fa_acc_set(sprot_varsplic_fa_path)
-    
+    # sprot_varsplic_fa_accs = parse_uniprot_fa_acc_set(sprot_varsplic_fa_path)
+    sprot_varsplic_fa_acc_gene, sprot_varsplic_fa_acc_len = parse_uniprot_fa_acc_gene_len(sprot_varsplic_fa_path)
+
     if Path(os.path.abspath(os.path.expanduser(args.sprot_fa_cache))).exists():
         sprot_fa_cache_path = verify_input_path(args.sprot_fa_cache)
         print(f'Loading from CACHE: {sprot_fa_cache_path.name}')
         with sprot_fa_cache_path.open(mode='r', encoding='utf-8') as f:
-            sprot_fa_accs = set(json.load(f))
+            sprot_fa_acc_gene, sprot_fa_acc_len = json.load(f)
     else:
         sprot_fa_cache_path = verify_output_path(args.sprot_fa_cache)
         print(f'Loading from SOURCE: {sprot_fa_path.name}')
-        sprot_fa_accs = parse_uniprot_fa_acc_set(sprot_fa_path)
+        # sprot_fa_accs = parse_uniprot_fa_acc_set(sprot_fa_path)
+        sprot_fa_acc_gene, sprot_fa_acc_len = parse_uniprot_fa_acc_gene_len(sprot_fa_path)
         with sprot_fa_cache_path.open(mode='w', encoding='utf-8') as f:
             json.dump(
-                list(sprot_fa_accs),
+                (dict([(a, tuple(sprot_fa_acc_gene[a])) for a in sprot_fa_acc_gene]), sprot_fa_acc_len),
                 f,
                 indent=2,
                 sort_keys=True
             )
-    
+
     if Path(os.path.abspath(os.path.expanduser(args.trembl_fa_cache))).exists():
         trembl_fa_cache_path = verify_input_path(args.trembl_fa_cache)
         print(f'Loading from CACHE: {trembl_fa_cache_path.name}')
         with trembl_fa_cache_path.open(mode='r', encoding='utf-8') as f:
-            trembl_fa_accs = set(json.load(f))
+            trembl_fa_acc_gene, trembl_fa_acc_len = json.load(f)
     else:
         trembl_fa_cache_path = verify_output_path(args.trembl_fa_cache)
         print(f'Loading from SOURCE: {trembl_fa_path.name}')
-        trembl_fa_accs = parse_uniprot_fa_acc_set(trembl_fa_path)
+        # trembl_fa_accs = parse_uniprot_fa_acc_set(trembl_fa_path)
+        trembl_fa_acc_gene, trembl_fa_acc_len = parse_uniprot_fa_acc_gene_len(trembl_fa_path)
         with trembl_fa_cache_path.open(mode='w', encoding='utf-8') as f:
             json.dump(
-                list(trembl_fa_accs),
+                (dict([(a, tuple(trembl_fa_acc_gene[a])) for a in trembl_fa_acc_gene]), trembl_fa_acc_len),
                 f,
                 indent=2,
                 sort_keys=True
             )
-    accs_with_seq = sprot_varsplic_fa_accs|sprot_fa_accs|trembl_fa_accs
+
+    # combine gene_accs and filter genes by gene_phenotype
+    # accs_with_seq = sprot_varsplic_fa_accs|sprot_fa_accs|trembl_fa_accs
     gene_acc = defaultdict(set)
+    phenotype_acc = defaultdict(set)
     for ga in (idmapping_gene_acc, sprot_gene_acc, trembl_gene_acc):
         for g in ga:
-            for a in ga[g]:
-                if a in accs_with_seq:
+            if g in gene_phenotype:
+                a_set = set(ga[g])
+                gene_acc[g] |= a_set
+                for p in gene_phenotype[g]:
+                    phenotype_acc[p] |= a_set
+    for ag in (sprot_varsplic_fa_acc_gene, sprot_fa_acc_gene, trembl_fa_acc_gene):
+        for a in ag:
+            for g in ag[a]:
+                if g in gene_phenotype:
                     gene_acc[g].add(a)
-    
+                    for p in gene_phenotype[g]:
+                        phenotype_acc[p].add(a)
+    # make a gene list sorted by number of sequences from least to most
+    print_dict_set_stats(gene_phenotype, 'gene_phenotype', 'Gene', 'Phenotype')
+    print_dict_set_stats(gene_acc, 'gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(phenotype_acc, 'phenotype_acc', 'Phenotype', 'Accession')
+
+
+    all_gene_acc = defaultdict(set)
+    all_phenotype_acc = defaultdict(set)
+    sprot_varsplic_fa_gene_acc = defaultdict(set)
+    sprot_varsplic_fa_phenotype_acc = defaultdict(set)
+    for g in gene_acc:
+        for a in gene_acc[g]:
+            if a in sprot_varsplic_fa_acc_gene:
+                all_gene_acc[g].add(a)
+                sprot_varsplic_fa_gene_acc[g].add(a)
+                for p in gene_phenotype[g]:
+                    all_phenotype_acc[p].add(a)
+                    sprot_varsplic_fa_phenotype_acc[p].add(a)
+    print_dict_set_stats(sprot_varsplic_fa_gene_acc, 'sprot_varsplic_fa_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(sprot_varsplic_fa_phenotype_acc, 'sprot_varsplic_fa_phenotype_acc', 'Phenotype', 'Accession')
+
+    sprot_fa_gene_acc = defaultdict(set)
+    sprot_fa_phenotype_acc = defaultdict(set)
+    for g in gene_acc:
+        for a in gene_acc[g]:
+            if a in sprot_fa_acc_gene:
+                all_gene_acc[g].add(a)
+                sprot_fa_gene_acc[g].add(a)
+                for p in gene_phenotype[g]:
+                    all_phenotype_acc[p].add(a)
+                    sprot_fa_phenotype_acc[p].add(a)
+    print_dict_set_stats(sprot_fa_gene_acc, 'sprot_fa_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(sprot_fa_phenotype_acc, 'sprot_fa_phenotype_acc', 'Phenotype', 'Accession')
+    print_dict_set_stats(all_gene_acc, 'sprot_varsplic_fa_gene_acc + sprot_fa_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(all_phenotype_acc, 'sprot_varsplic_fa_phenotype_acc + sprot_fa_phenotype_acc', 'Phenotype', 'Accession')
+
+    trembl_fa_gene_acc = defaultdict(set)
+    trembl_fa_phenotype_acc = defaultdict(set)
+    for g in gene_acc:
+        for a in gene_acc[g]:
+            if a in trembl_fa_acc_gene:
+                all_gene_acc[g].add(a)
+                trembl_fa_gene_acc[g].add(a)
+                for p in gene_phenotype[g]:
+                    all_phenotype_acc[p].add(a)
+                    trembl_fa_phenotype_acc[p].add(a)
+    print_dict_set_stats(trembl_fa_gene_acc, 'trembl_fa_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(trembl_fa_phenotype_acc, 'trembl_fa_phenotype_acc', 'Phenotype', 'Accession')
+    print_dict_set_stats(all_gene_acc, 'sprot_varsplic_fa_gene_acc + sprot_fa_gene_acc + trembl_fa_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(all_phenotype_acc, 'sprot_varsplic_fa_phenotype_acc + sprot_fa_phenotype_acc + trembl_fa_phenotype_acc', 'Phenotype', 'Accession')
+
+    # use all of sprot_varsplic + sprot sequences
+    # plus at most 500 sequences for each gene in trembl
+    chosen_trembl_fa_gene_acc = defaultdict(set)
+    extra_trembl_fa_gene_acc = defaultdict(set)
+    chosen_accs = set()
+    extra_accs = set()
+    trembl_gene_acc_limit = 500
+    # sort trembl genes by number of acc
+    sorted_trembl_fa_gene = sorted(trembl_fa_gene_acc, key=lambda k: (len(trembl_fa_gene_acc[k]), k))
+    for i, g in enumerate(sorted_trembl_fa_gene):
+        acc_set = trembl_fa_gene_acc[g] - extra_accs
+        if len(acc_set) > trembl_gene_acc_limit:
+            already_chosen = acc_set & chosen_accs
+            acc_set -= chosen_accs
+            chosen_trembl_fa_gene_acc[g] |= already_chosen
+            # chosen_accs |= already_chosen
+            if len(already_chosen) > trembl_gene_acc_limit:
+                extra_trembl_fa_gene_acc[g] |= acc_set
+                extra_accs |= acc_set
+            else:
+                limit = trembl_gene_acc_limit - len(already_chosen)
+                # sort accessions by sequence length
+                sorted_acc = sorted(acc_set, key=lambda k: (trembl_fa_acc_len[k], k))
+                # sort accessions into 500 buckets and choose one from each bucket
+                acc_per_bucket = len(sorted_acc) / limit
+                # prefer longest sequence in a bucket
+                chosen_acc_set = set([sorted_acc[int(i*acc_per_bucket):int((i+1)*acc_per_bucket)][-1] for i in range(limit)])
+                extra_acc_set = acc_set - chosen_acc_set
+                chosen_trembl_fa_gene_acc[g] |= chosen_acc_set
+                chosen_accs |= chosen_acc_set
+                extra_trembl_fa_gene_acc[g] |= extra_acc_set
+                extra_accs |= extra_acc_set
+                # debug, extra items will fill in from the last bucket
+                # i = 15
+                # trembl_gene_acc_limit = 5
+                # sorted_acc = list(range(i))
+                # acc_count = len(sorted_acc)
+                # acc_per_bucket = acc_count / trembl_gene_acc_limit
+                # for i in range(trembl_gene_acc_limit): print(sorted_acc[int(i*acc_per_bucket):int((i+1)*acc_per_bucket)])
+        else:
+            chosen_trembl_fa_gene_acc[g] |= acc_set
+            chosen_accs |= acc_set
+    print_dict_set_stats(chosen_trembl_fa_gene_acc, 'chosen_trembl_fa_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(extra_trembl_fa_gene_acc, 'extra_trembl_fa_gene_acc', 'Gene', 'Accession')
+    # Combine
+    # sprot_varsplic_fa_gene_acc
+    # sprot_fa_gene_acc
+    # chosen_trembl_fa_gene_acc
+    train_gene_acc = defaultdict(set)
+    train_phenotype_acc = defaultdict(set)
+    for ga in (sprot_varsplic_fa_gene_acc, sprot_fa_gene_acc, chosen_trembl_fa_gene_acc):
+        for g in ga:
+            train_gene_acc[g] |= ga[g]
+            for p in gene_phenotype[g]:
+                train_phenotype_acc[p] |= ga[g]
+    print_dict_set_stats(train_gene_acc, 'train_gene_acc', 'Gene', 'Accession')
+    print_dict_set_stats(train_phenotype_acc, 'train_phenotype_acc', 'Phenotype', 'Accession')
+
+    test_gene_acc = extra_trembl_fa_gene_acc
+    test_phenotype_acc = defaultdict(set)
+    for g in test_gene_acc:
+        for p in gene_phenotype[g]:
+            test_phenotype_acc[p] |= test_gene_acc[g]
     out_path = verify_output_path(args.out)
     with out_path.open(mode='w', encoding='utf-8') as f:
         json.dump(
-            dict([(g, tuple(gene_acc[g])) for g in gene_acc]),
+            {
+                'train_gene_acc': dict([(g, tuple(train_gene_acc[g])) for g in train_gene_acc]),
+                'train_phenotype_acc': dict([(p, tuple(train_phenotype_acc[p])) for p in train_phenotype_acc]),
+                'test_gene_acc': dict([(g, tuple(test_gene_acc[g])) for g in test_gene_acc]),
+                'test_phenotype_acc': dict([(p, tuple(test_phenotype_acc[p])) for p in test_phenotype_acc]),
+            },
             f,
             indent=2,
             sort_keys=True
         )
-    print(f'\n=== FINAL GENE ACC ===')
-    print(f'Genes: {len(gene_acc)}')  # 4231
-    print(f'Accessions: {len(set([a for g in gene_acc for a in gene_acc[g]]))}')  # 4231
 
-    print(f'\n=== GENES ===')
-    idmapping_genes = set(idmapping_gene_acc)
-    sprot_genes = set(sprot_gene_acc)
-    trembl_genes = set(trembl_gene_acc)
-    print_set_stats('IDMAPPING', idmapping_genes, 'SPROT', sprot_genes)
-    print_set_stats('IDMAPPING', idmapping_genes, 'TREMBL', trembl_genes)
-    print_set_stats('IDMAPPING', idmapping_genes, 'SPROT|TREMBL', sprot_genes|trembl_genes)
-    print(f'\n=== ACCESSIONS ID DAT ===')
-    idmapping_accs = set([a for g in idmapping_gene_acc for a in idmapping_gene_acc[g]])
-    sprot_accs = set([a for g in sprot_gene_acc for a in sprot_gene_acc[g]])
-    trembl_accs = set([a for g in trembl_gene_acc for a in trembl_gene_acc[g]])
-    print_set_stats('IDMAPPING', idmapping_accs, 'SPROT', sprot_accs)
-    print_set_stats('IDMAPPING', idmapping_accs, 'TREMBL', trembl_accs)
-    print_set_stats('IDMAPPING', idmapping_accs, 'SPROT|TREMBL', sprot_accs|trembl_accs)
-    print(f'\n=== ACCESSIONS ID FA ===')
-    print_set_stats('IDMAPPING', idmapping_accs, 'SPROT_V_FA', sprot_varsplic_fa_accs)
-    print_set_stats('IDMAPPING', idmapping_accs, 'SPROT_FA', sprot_fa_accs)
-    print_set_stats('IDMAPPING', idmapping_accs, 'TREMBL_FA', trembl_fa_accs)
-    print(f'\n=== ACCESSIONS DAT FA===')
-    print_set_stats('SPROT', sprot_accs, 'SPROT_V_FA', sprot_varsplic_fa_accs)
-    print_set_stats('SPROT', sprot_accs, 'SPROT_FA', sprot_fa_accs)
-    print_set_stats('TREMBL', trembl_accs, 'TREMBL_FA', trembl_fa_accs)
-    print(f'\n=== ACCESSIONS FINAL ===')
-    print_set_stats('IDMAPPING|SPROT|TREMBL', idmapping_accs|sprot_accs|trembl_accs, 'SPROT_V_FA|SPROT_FA|TREMBL_FA', sprot_varsplic_fa_accs|sprot_fa_accs|trembl_fa_accs)
-    print(f'\n=== GENE-ACCESSIONS ===')
-    idmapping_gene_acc_set = set([(g, a) for g in idmapping_gene_acc for a in idmapping_gene_acc[g]])
-    sprot_gene_acc_set = set([(g, a) for g in sprot_gene_acc for a in sprot_gene_acc[g]])
-    trembl_gene_acc_set = set([(g, a) for g in trembl_gene_acc for a in trembl_gene_acc[g]])
-    print_set_stats('IDMAPPING', idmapping_gene_acc_set, 'SPROT', sprot_gene_acc_set)
-    print_set_stats('IDMAPPING', idmapping_gene_acc_set, 'TREMBL', trembl_gene_acc_set)
-    print_set_stats('IDMAPPING', idmapping_gene_acc_set, 'SPROT|TREMBL', sprot_gene_acc_set|trembl_gene_acc_set)
+
+    # out_path = verify_output_path(args.out)
+    # with out_path.open(mode='w', encoding='utf-8') as f:
+    #     json.dump(
+    #         dict([(g, tuple(gene_acc[g])) for g in gene_acc]),
+    #         f,
+    #         indent=2,
+    #         sort_keys=True
+    #     )
+    # print(f'\n=== FINAL GENE ACC ===')
+    # print(f'Genes: {len(gene_acc)}')  # 4231
+    # print(f'Accessions: {len(set([a for g in gene_acc for a in gene_acc[g]]))}')  # 4231
+
+    # print(f'\n=== GENES ===')
+    # idmapping_genes = set(idmapping_gene_acc)
+    # sprot_genes = set(sprot_gene_acc)
+    # trembl_genes = set(trembl_gene_acc)
+    # print_set_stats('IDMAPPING', idmapping_genes, 'SPROT', sprot_genes)
+    # print_set_stats('IDMAPPING', idmapping_genes, 'TREMBL', trembl_genes)
+    # print_set_stats('IDMAPPING', idmapping_genes, 'SPROT|TREMBL', sprot_genes|trembl_genes)
+    # print(f'\n=== ACCESSIONS ID DAT ===')
+    # idmapping_accs = set([a for g in idmapping_gene_acc for a in idmapping_gene_acc[g]])
+    # sprot_accs = set([a for g in sprot_gene_acc for a in sprot_gene_acc[g]])
+    # trembl_accs = set([a for g in trembl_gene_acc for a in trembl_gene_acc[g]])
+    # print_set_stats('IDMAPPING', idmapping_accs, 'SPROT', sprot_accs)
+    # print_set_stats('IDMAPPING', idmapping_accs, 'TREMBL', trembl_accs)
+    # print_set_stats('IDMAPPING', idmapping_accs, 'SPROT|TREMBL', sprot_accs|trembl_accs)
+    # print(f'\n=== ACCESSIONS ID FA ===')
+    # print_set_stats('IDMAPPING', idmapping_accs, 'SPROT_V_FA', sprot_varsplic_fa_accs)
+    # print_set_stats('IDMAPPING', idmapping_accs, 'SPROT_FA', sprot_fa_accs)
+    # print_set_stats('IDMAPPING', idmapping_accs, 'TREMBL_FA', trembl_fa_accs)
+    # print(f'\n=== ACCESSIONS DAT FA===')
+    # print_set_stats('SPROT', sprot_accs, 'SPROT_V_FA', sprot_varsplic_fa_accs)
+    # print_set_stats('SPROT', sprot_accs, 'SPROT_FA', sprot_fa_accs)
+    # print_set_stats('TREMBL', trembl_accs, 'TREMBL_FA', trembl_fa_accs)
+    # print(f'\n=== ACCESSIONS FINAL ===')
+    # print_set_stats('IDMAPPING|SPROT|TREMBL', idmapping_accs|sprot_accs|trembl_accs, 'SPROT_V_FA|SPROT_FA|TREMBL_FA', sprot_varsplic_fa_accs|sprot_fa_accs|trembl_fa_accs)
+    # print(f'\n=== GENE-ACCESSIONS ===')
+    # idmapping_gene_acc_set = set([(g, a) for g in idmapping_gene_acc for a in idmapping_gene_acc[g]])
+    # sprot_gene_acc_set = set([(g, a) for g in sprot_gene_acc for a in sprot_gene_acc[g]])
+    # trembl_gene_acc_set = set([(g, a) for g in trembl_gene_acc for a in trembl_gene_acc[g]])
+    # print_set_stats('IDMAPPING', idmapping_gene_acc_set, 'SPROT', sprot_gene_acc_set)
+    # print_set_stats('IDMAPPING', idmapping_gene_acc_set, 'TREMBL', trembl_gene_acc_set)
+    # print_set_stats('IDMAPPING', idmapping_gene_acc_set, 'SPROT|TREMBL', sprot_gene_acc_set|trembl_gene_acc_set)
 
     print(f'Run time: {time.time() - start_time:.2f} s\n')
 
 
 # W2125
 # check acc in fasta
-# /home/hotdogee/venv/tf15/bin/python -m util.idmapping.make_gene_symbol_mapping_from_idmapping --idmapping /data12/idmapping/idmapping-20191105/idmapping_filtered.dat --sprot /data12/uniprot/uniprot-20191109/uniprot_sprot.dat --trembl /data12/uniprot/uniprot-20191109/uniprot_trembl.dat --idmapping_cache /data12/idmapping/idmapping-20191105/idmapping-20191105_gene_acc.json --sprot_cache /data12/idmapping/idmapping-20191105/sprot-20191109_gene_acc.json --trembl_cache /data12/idmapping/idmapping-20191105/trembl-20191109_gene_acc.json --sprot_varsplic_fa /data12/uniprot/uniprot-20191109/uniprot_sprot_varsplic.fasta --sprot_fa /data12/uniprot/uniprot-20191109/uniprot_sprot.fasta --trembl_fa /data12/uniprot/uniprot-20191109/uniprot_trembl.fasta --sprot_fa_cache /data12/idmapping/idmapping-20191105/sprot-fa-20191109_acc.json --trembl_fa_cache /data12/idmapping/idmapping-20191105/trembl-fa-20191109_acc.json --out /data12/hpo/hpo-20191011/uniprot-20191109-gene-acc.json
+# /home/hotdogee/venv/tf15/bin/python -m util.idmapping.make_acc_gene_phenotype --idmapping /data12/idmapping/idmapping-20191105/idmapping_filtered.dat --sprot /data12/uniprot/uniprot-20191109/uniprot_sprot.dat --trembl /data12/uniprot/uniprot-20191109/uniprot_trembl.dat --idmapping_cache /data12/idmapping/idmapping-20191105/idmapping-20191105_gene_acc.json --sprot_cache /data12/idmapping/idmapping-20191105/sprot-20191109_gene_acc.json --trembl_cache /data12/idmapping/idmapping-20191105/trembl-20191109_gene_acc.json --sprot_varsplic_fa /data12/uniprot/uniprot-20191109/uniprot_sprot_varsplic.fasta --sprot_fa /data12/uniprot/uniprot-20191109/uniprot_sprot.fasta --trembl_fa /data12/uniprot/uniprot-20191109/uniprot_trembl.fasta --sprot_fa_cache /data12/idmapping/idmapping-20191105/sprot-fa-20191109_acc_gene_len.json --trembl_fa_cache /data12/idmapping/idmapping-20191105/trembl-fa-20191109_acc_gene_len.json --gene_phenotype /data12/hpo/hpo-20191011/hpo-20191011-gene-phenotype.json --out /data12/hpo/hpo-20191011/hpo-20191011-gene_acc_phenotype.json
 
-# === ACCESSIONS ID FA ===
+# === gene_phenotype ===
+#  - Genes: 13478
+#  - Phenotypes: 8076
+#  - Phenotypes per Gene: (Min, Median, Max): 1, 20, 457
+#  - Genes per Phenotype: (Min, Median, Max): 1, 10, 8354
 
-# IDMAPPING: 172393363  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# SPROT_V_FA: 40190  (['Q8R035-2', 'O01761-5', 'Q3UR50-2', 'Q01002-2', 'Q8BGS1-2'])
-# IDMAPPING & SPROT_V_FA: 0  ([])
-# IDMAPPING | SPROT_V_FA: 172433553  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# IDMAPPING - SPROT_V_FA: 172393363  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# SPROT_V_FA - IDMAPPING: 40190  (['Q8R035-2', 'O01761-5', 'Q3UR50-2', 'Q01002-2', 'Q8BGS1-2'])
+# === gene_acc ===
+#  - Genes: 8301
+#  - Accessions: 3568050
+#  - Accessions per Gene: (Min, Median, Max): 1, 114, 172408
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 6
 
+# === phenotype_acc ===
+#  - Phenotypes: 8017
+#  - Accessions: 3568050
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 1526, 2139046
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 31, 457
 
-# IDMAPPING: 172393363  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# SPROT_FA: 561176  (['Q0AYQ8', 'Q9CB81', 'P58573', 'Q01778', 'Q99J45'])
-# IDMAPPING & SPROT_FA: 537832  (['Q0AYQ8', 'Q9CB81', 'P58573', 'Q99J45', 'Q01778'])
-# IDMAPPING | SPROT_FA: 172416707  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# IDMAPPING - SPROT_FA: 171855531  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# SPROT_FA - IDMAPPING: 23344  (['Q9BPG8', 'P34701', 'P20347', 'P85378', 'B2RBV5'])
+# === sprot_varsplic_fa_gene_acc ===
+#  - Genes: 2838
+#  - Accessions: 7241
+#  - Accessions per Gene: (Min, Median, Max): 1, 2, 80
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 1
 
+# === sprot_varsplic_fa_phenotype_acc ===
+#  - Phenotypes: 7134
+#  - Accessions: 7241
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 11, 4807
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 33, 457
 
-# IDMAPPING: 172393363  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# TREMBL_FA: 180179667  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# IDMAPPING & TREMBL_FA: 171855531  (['A0A0L7AAL6', 'G5GDV7', 'A0A0E9ZGR5', 'A0A559RRJ2', 'A0A2G3CII6'])
-# IDMAPPING | TREMBL_FA: 180717499  (['A0A0E9ZGR5', 'A0A429CRF1', 'A0A1I7CN51', 'A0A0Q0G322', 'A0A287KVY2'])
-# IDMAPPING - TREMBL_FA: 537832  (['Q0AYQ8', 'Q9CB81', 'P58573', 'Q99J45', 'Q01778'])
-# TREMBL_FA - IDMAPPING: 8324136  (['A0A0P4ZIZ7', 'A0A287DWB4', 'A0A3B4Y5K4', 'A0A3Q3LIP9', 'A0A3B6LPN1'])
+# === sprot_fa_gene_acc ===
+#  - Genes: 7765
+#  - Accessions: 53708
+#  - Accessions per Gene: (Min, Median, Max): 1, 3, 1778
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 6
 
+# === sprot_fa_phenotype_acc ===
+#  - Phenotypes: 8006
+#  - Accessions: 53708
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 36, 33377
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 28, 457
 
-# === ACCESSIONS DAT FA===
+# === sprot_varsplic_fa_gene_acc + sprot_fa_gene_acc ===
+#  - Genes: 7765
+#  - Accessions: 60949
+#  - Accessions per Gene: (Min, Median, Max): 1, 4, 1778
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 6
 
-# SPROT: 751522  (['Q9CB81', 'Q01778', 'Q58A63', 'Q9AGA5', 'P26766'])
-# SPROT_V_FA: 40190  (['Q8R035-2', 'O01761-5', 'Q3UR50-2', 'Q01002-2', 'Q8BGS1-2'])
-# SPROT & SPROT_V_FA: 0  ([])
-# SPROT | SPROT_V_FA: 791712  (['Q9CB81', 'Q01778', 'Q58A63', 'Q9AGA5', 'P26766'])
-# SPROT - SPROT_V_FA: 751522  (['Q9CB81', 'Q01778', 'Q58A63', 'Q9AGA5', 'P26766'])
-# SPROT_V_FA - SPROT: 40190  (['Q8R035-2', 'O01761-5', 'Q3UR50-2', 'Q01002-2', 'Q8BGS1-2'])
+# === sprot_varsplic_fa_phenotype_acc + sprot_fa_phenotype_acc ===
+#  - Phenotypes: 8006
+#  - Accessions: 60949
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 45, 38184
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 28, 457
 
+# === trembl_fa_gene_acc ===
+#  - Genes: 7147
+#  - Accessions: 3439400
+#  - Accessions per Gene: (Min, Median, Max): 1, 131, 169566
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 6
 
-# SPROT: 751522  (['Q9CB81', 'Q01778', 'Q58A63', 'Q9AGA5', 'P26766'])
-# SPROT_FA: 561176  (['Q0AYQ8', 'Q9CB81', 'P58573', 'Q01778', 'Q99J45'])
-# SPROT & SPROT_FA: 537765  (['Q0AYQ8', 'Q9CB81', 'P58573', 'Q99J45', 'Q01778'])
-# SPROT | SPROT_FA: 774933  (['Q9CB81', 'Q58A63', 'Q9AGA5', 'P26766', 'Q9UTM9'])
-# SPROT - SPROT_FA: 213757  (['I7G414', 'Q58A63', 'Q9AGA5', 'P26766', 'Q8CAC5'])
-# SPROT_FA - SPROT: 23411  (['Q9BPG8', 'P34701', 'A0A0R4IES7', 'P20347', 'P85378'])
+# === trembl_fa_phenotype_acc ===
+#  - Phenotypes: 8013
+#  - Accessions: 3439400
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 1407, 2057298
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 31, 457
 
+# === sprot_varsplic_fa_gene_acc + sprot_fa_gene_acc + trembl_fa_gene_acc ===
+#  - Genes: 8301
+#  - Accessions: 3500349
+#  - Accessions per Gene: (Min, Median, Max): 1, 106, 171344
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 6
 
-# TREMBL: 172435657  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# TREMBL_FA: 180179667  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# TREMBL & TREMBL_FA: 171838911  (['A0A0L7AAL6', 'G5GDV7', 'A0A0E9ZGR5', 'A0A559RRJ2', 'A0A2G3CII6'])
-# TREMBL | TREMBL_FA: 180776413  (['A0A0E9ZGR5', 'A0A429CRF1', 'A0A1I7CN51', 'A0A0Q0G322', 'A0A287KVY2'])
-# TREMBL - TREMBL_FA: 596746  (['A0A1H6HPY6', 'A0A0C2K8H6', 'Q6M7E5', 'B9QMC5', 'H1FYR3'])
-# TREMBL_FA - TREMBL: 8340756  (['A0A0P4ZIZ7', 'A0A287DWB4', 'A0A3B4Y5K4', 'A0A3Q3LIP9', 'A0A3B6LPN1'])
+# === sprot_varsplic_fa_phenotype_acc + sprot_fa_phenotype_acc + trembl_fa_phenotype_acc ===
+#  - Phenotypes: 8017
+#  - Accessions: 3500349
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 1454, 2095482
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 31, 457
 
+# === chosen_trembl_fa_gene_acc ===
+#  - Genes: 7147
+#  - Accessions: 1057693
+#  - Accessions per Gene: (Min, Median, Max): 1, 131, 993
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 5
 
-# === ACCESSIONS FINAL ===
+# === extra_trembl_fa_gene_acc ===
+#  - Genes: 402
+#  - Accessions: 2381707
+#  - Accessions per Gene: (Min, Median, Max): 1, 725, 169065
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 1
 
-# IDMAPPING|SPROT|TREMBL: 173203866  (['A0A0E9ZGR5', 'A0A429CRF1', 'A0A1I7CN51', 'A0A0Q0G322', 'A0A1C0SFD7'])
-# SPROT_V_FA|SPROT_FA|TREMBL_FA: 180781033  (['A0A0L7AAL6', 'G5GDV7', 'A0A559RRJ2', 'A0A2G3CII6', 'A0A0E9ZGR5'])
-# IDMAPPING|SPROT|TREMBL & SPROT_V_FA|SPROT_FA|TREMBL_FA: 172393363  (['A0A0L7AAL6', 'G5GDV7', 'A0A0E9ZGR5', 'A0A559RRJ2', 'A0A2G3CII6'])
-# IDMAPPING|SPROT|TREMBL | SPROT_V_FA|SPROT_FA|TREMBL_FA: 181591536  (['A0A0E9ZGR5', 'A0A429CRF1', 'A0A1I7CN51', 'A0A0Q0G322', 'A0A287KVY2'])
-# IDMAPPING|SPROT|TREMBL - SPROT_V_FA|SPROT_FA|TREMBL_FA: 810503  (['A0A1H6HPY6', 'Q58A63', 'Q9AGA5', 'P26766', 'Q6M7E5'])
-# SPROT_V_FA|SPROT_FA|TREMBL_FA - IDMAPPING|SPROT|TREMBL: 8387670  (['A0A0P4ZIZ7', 'A0A287DWB4', 'A0A3B4Y5K4', 'A0A3Q3LIP9', 'A0A3B6LPN1'])
+# === train_gene_acc ===
+#  - Genes: 8301
+#  - Accessions: 1118642
+#  - Accessions per Gene: (Min, Median, Max): 1, 106, 2278
+#  - Genes per Accession: (Min, Median, Max): 1, 1, 6
 
-# W2125
-# with same uniprot version as idmapping
-# /home/hotdogee/venv/tf15/bin/python -m util.idmapping.make_gene_symbol_mapping_from_idmapping --idmapping /data12/idmapping/idmapping-20191105/idmapping_filtered.dat --sprot /data12/uniprot/uniprot-20191109/uniprot_sprot.dat --trembl /data12/uniprot/uniprot-20191109/uniprot_trembl.dat --idmapping_cache /data12/idmapping/idmapping-20191105/idmapping-20191105_gene_acc.json --sprot_cache /data12/idmapping/idmapping-20191105/sprot-20191109_gene_acc.json --trembl_cache /data12/idmapping/idmapping-20191105/trembl-20191109_gene_acc.json
+# === train_phenotype_acc ===
+#  - Phenotypes: 8017
+#  - Accessions: 1118642
+#  - Accessions per Phenotype: (Min, Median, Max): 1, 1173, 741799
+#  - Phenotypes per Accession: (Min, Median, Max): 1, 29, 457
 
-# === GENES ===
-
-# IDMAPPING: 191778903  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# SPROT: 601032  (['YNL221C', 'NORA', 'SPH_1624', 'LPL1553', 'M6_SPY0373'])
-# IDMAPPING & SPROT: 599591  (['YNL221C', 'SPH_1624', 'NORA', 'LPL1553', 'M6_SPY0373'])
-# IDMAPPING | SPROT: 191780344  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# IDMAPPING - SPROT: 191179312  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# SPROT - IDMAPPING: 1441  (['ARB_05535', 'UNQ647', 'UNQ213', 'UNQ3054', 'UNQ743'])
-
-
-# IDMAPPING: 191778903  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# TREMBL: 191070197  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'DXD79_30565'])
-# IDMAPPING & TREMBL: 191024696  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# IDMAPPING | TREMBL: 191824404  (['A5320_16100', 'DXT71_28225', 'KNAG0E03910', 'SEENIN0B_04151', 'ERS852396_03638'])
-# IDMAPPING - TREMBL: 754207  (['M6_SPY0373', 'TEV-8 ESAG6', 'DSEC\\GM23019', 'MMP16 (1 OF MANY)', 'AN0973'])
-# TREMBL - IDMAPPING: 45501  (['GENE_5.589', 'ABSGL_00894.1', 'GENE_1.826', 'ABSGL_12366.1', 'GENE_12.111'])
-
-
-# IDMAPPING: 191778903  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# SPROT|TREMBL: 191561321  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'DXD79_30565'])
-# IDMAPPING & SPROT|TREMBL: 191514408  (['RR48_09140', 'A5320_16100', 'X738_15495', 'E2R60_18950', 'BZ723_17495'])
-# IDMAPPING | SPROT|TREMBL: 191825816  (['A5320_16100', 'DXT71_28225', 'KNAG0E03910', 'SEENIN0B_04151', 'ERS852396_03638'])
-# IDMAPPING - SPROT|TREMBL: 264495  (['DPER\\GL18709', 'DERE\\GG26593', 'PARPA_12374.1 SCAFFOLD 44939', 'DPER\\GL17730', 'TEV-8 ESAG6'])
-# SPROT|TREMBL - IDMAPPING: 46913  (['GENE_5.589', 'ABSGL_00894.1', 'GENE_1.826', 'ABSGL_12366.1', 'GENE_12.111'])
-
-
-# === ACCESSIONS ===
-
-# IDMAPPING: 172393363  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# SPROT: 751522  (['A5YYW1', 'Q81WP2', 'Q1JHC1', 'A9BHV5', 'Q7TS92'])
-# IDMAPPING & SPROT: 537765  (['Q81WP2', 'Q1JHC1', 'A9BHV5', 'C6BW42', 'P35461'])
-# IDMAPPING | SPROT: 172607120  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# IDMAPPING - SPROT: 171855598  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# SPROT - IDMAPPING: 213757  (['Q3KT79', 'O88922', 'A5YYW1', 'Q3LTM6', 'Q06993'])
-
-
-# IDMAPPING: 172393363  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# TREMBL: 172435657  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# IDMAPPING & TREMBL: 171838911  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# IDMAPPING | TREMBL: 172990109  (['A0A4Q1RZ87', 'A0A0K9QVS2', 'A0A4R4BD07', 'A0A3D3QBA8', 'A0A4R5K5S1'])
-# IDMAPPING - TREMBL: 554452  (['Q81WP2', 'Q1JHC1', 'A9BHV5', 'C6BW42', 'O13125'])
-# TREMBL - IDMAPPING: 596746  (['U1T0U1', 'A0A1D9IIY7', 'A0A0C3Y602', 'A0A2M9SF76', 'F7HEY7'])
-
-
-# IDMAPPING: 172393363  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# SPROT|TREMBL: 173187179  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# IDMAPPING & SPROT|TREMBL: 172376676  (['W2VK39', 'A0A085KBG3', 'A0A2W6A2R7', 'A0A4Q1RZ87', 'A0A415PP57'])
-# IDMAPPING | SPROT|TREMBL: 173203866  (['A0A4Q1RZ87', 'A0A0K9QVS2', 'A0A4R4BD07', 'A0A3D3QBA8', 'A0A4R5K5S1'])
-# IDMAPPING - SPROT|TREMBL: 16687  (['A5WVJ3', 'A0A0R4ICQ9', 'A0A1A8NBK6', 'A0A1C3GTQ8', 'A3QJW2'])
-# SPROT|TREMBL - IDMAPPING: 810503  (['A5YYW1', 'C8VC28', 'Q20RW8', 'Q6XBG7', 'Q7TS92'])
-
-
-# === GENE-ACCESSIONS ===
-
-# IDMAPPING: 232457717  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('EDD29_3118', 'A0A3N1CW91'), ('FN961_00625', 'A0A553JUN9')])
-# SPROT: 1680324  ([('MDOB', 'Q8XB59'), ('AT4G16780', 'A5Y7I5'), ('OSJ_28928', 'A3BXL8'), ('POLI', 'Q9R1A6'), ('TRPA', 'A9AAU6')])
-# IDMAPPING & SPROT: 1095491  ([('MDOB', 'Q8XB59'), ('CPF_1648', 'Q0TQK1'), ('TSAD', 'A9W0N8'), ('MTND2', 'Q32ZZ9'), ('SEC24', 'Q0PVD8')])
-# IDMAPPING | SPROT: 233042550  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('EDD29_3118', 'A0A3N1CW91'), ('FN961_00625', 'A0A553JUN9')])
-# IDMAPPING - SPROT: 231362226  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('EDD29_3118', 'A0A3N1CW91'), ('FN961_00625', 'A0A553JUN9')])
-# SPROT - IDMAPPING: 584833  ([('ERN1', 'A1L457'), ('PIR1', 'A0A1D8PIA7'), ('LYRM5', 'B2KFC1'), ('AT4G16780', 'A5Y7I5'), ('TRA1B', 'Q9D1F8')])
-
-
-# IDMAPPING: 232457717  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('EDD29_3118', 'A0A3N1CW91'), ('FN961_00625', 'A0A553JUN9')])
-# TREMBL: 235640011  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('FN961_00625', 'A0A553JUN9'), ('EDD29_3118', 'A0A3N1CW91')])
-# IDMAPPING & TREMBL: 230957813  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('FN961_00625', 'A0A553JUN9'), ('EDD29_3118', 'A0A3N1CW91')])
-# IDMAPPING | TREMBL: 237139915  ([('SIPO8835_20380', 'A0A540QAH4'), ('FN961_00625', 'A0A553JUN9'), ('CFAP74', 'A0A4X1W956'), ('BVCMSKSP015_02322', 'E2QJE1'), ('E7742_17180', 'A0A4P8PW83')])
-# IDMAPPING - TREMBL: 1499904  ([('MDOB', 'Q8XB59'), ('SI:DKEY-46A10.2', 'A8Y5U0'), ('DYAK\\BRU-3', 'A0A0R1DXJ0'), ('OSJ_28928', 'A3BXL8'), ('DMOJ\\GI22120', 'B4K9G7')])
-# TREMBL - IDMAPPING: 4682198  ([('D9G48_14880', 'A0A379ZH46'), ('SAMEA104154639_00246', 'G8JZV3'), ('COL92_19360', 'C2PGB1'), ('D8846_08585', 'D4FSN5'), ('DSEC', 'B4HU04')])
-
-
-# IDMAPPING: 232457717  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('EDD29_3118', 'A0A3N1CW91'), ('FN961_00625', 'A0A553JUN9')])
-# SPROT|TREMBL: 237320335  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('FN961_00625', 'A0A553JUN9'), ('EDD29_3118', 'A0A3N1CW91')])
-# IDMAPPING & SPROT|TREMBL: 232053304  ([('HMPREF0027_1511', 'E8KI44'), ('SIPO8835_20380', 'A0A540QAH4'), ('E6G01_05700', 'A0A538LTK7'), ('FN961_00625', 'A0A553JUN9'), ('EDD29_3118', 'A0A3N1CW91')])
-# IDMAPPING | SPROT|TREMBL: 237724748  ([('SIPO8835_20380', 'A0A540QAH4'), ('FN961_00625', 'A0A553JUN9'), ('CFAP74', 'A0A4X1W956'), ('BVCMSKSP015_02322', 'E2QJE1'), ('E7742_17180', 'A0A4P8PW83')])
-# IDMAPPING - SPROT|TREMBL: 404413  ([('CYT B', 'A0A515HLA2'), ('DMOJ\\GI17316', 'B4KL86'), ('HDL IVA', 'A0A3S4M7N2'), ('ABSGL_13655.1 SCAFFOLD 14267', 'A0A168S731'), ('L(2)17F1', 'A0A0B4K7Q4')])
-# SPROT|TREMBL - IDMAPPING: 5267031  ([('SAMEA104154639_00246', 'G8JZV3'), ('KTRA', 'D1JJV8'), ('D9L89_06095', 'A0A0J3Z762'), ('SAMEA3753290_01389', 'A0A233AT94'), ('POLI', 'Q9R1A6')])
-
-# Run time: 16926.15 s
-
-# W2125
-# with old uniprot
-# /home/hotdogee/venv/tf15/bin/python -m util.idmapping.make_gene_symbol_mapping_from_idmapping --idmapping /data12/idmapping/idmapping-20191105/idmapping_filtered.dat --sprot /data12/uniprot/uniprot-20191015/uniprot_sprot.dat --trembl /data12/uniprot/uniprot-20191015/uniprot_trembl.dat --idmapping_cache /data12/idmapping/idmapping-20191105/idmapping-20191105_gene_acc.json --sprot_cache /data12/idmapping/idmapping-20191105/sprot-20191015_gene_acc.json --trembl_cache /data12/idmapping/idmapping-20191105/trembl-20191015_gene_acc.json
-
-# Processing: idmapping_filtered.dat, uniprot_sprot.dat, uniprot_trembl.dat
-# idmapping_filtered.dat: 100 232575355/232575355 [10:22<00:00, 373911.58lines/s]
-# uniprot_sprot.dat: 100 3.02G/3.02G [00:44<00:00, 73.6MB/s]
-# uniprot_trembl.dat: 100 519G/519G [2:07:13<00:00, 73.0MB/s]
-
-# === GENES ===
-
-# IDMAPPING: 191778903  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# SPROT: 600594  (['MIMI_L171', 'BB4400', 'RALTA_A1117', 'LREU_0369', 'ACEL_1191'])
-# IDMAPPING & SPROT: 599133  (['MIMI_L171', 'BB4400', 'RALTA_A1117', 'LREU_0369', 'ACEL_1191'])
-# IDMAPPING | SPROT: 191780364  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# IDMAPPING - SPROT: 191179770  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# SPROT - IDMAPPING: 1461  (['Y71H9A.3', '1-6', 'UNQ3034', 'MM_2048', 'UNQ214'])
-
-
-# IDMAPPING: 191778903  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# TREMBL: 180548850  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# IDMAPPING & TREMBL: 179525756  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# IDMAPPING | TREMBL: 192801997  (['SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'C5609_00595', 'UC41_12950'])
-# IDMAPPING - TREMBL: 12253147  (['LAWI1_G001600', 'VROAM7_12580', 'PAN110_30290', 'RALTA_A1117', 'E5F65_18750'])
-# TREMBL - IDMAPPING: 1023094  (['E1J38_03460', 'FG657_01705', 'SAMEA3354326_02210', 'E1814_17715', 'C0Q93_28140'])
-
-
-# IDMAPPING: 191778903  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# SPROT|TREMBL: 181040375  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# IDMAPPING & SPROT|TREMBL: 180015848  (['DX05_08315', 'SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'DICSQDRAFT_13941'])
-# IDMAPPING | SPROT|TREMBL: 192803430  (['SMAX5B_006463', 'NCTC10583_00675', 'EV653_5077', 'C5609_00595', 'UC41_12950'])
-# IDMAPPING - SPROT|TREMBL: 11763055  (['LAWI1_G001600', 'VROAM7_12580', 'PAN110_30290', 'E5F65_18750', 'E6H66_07065'])
-# SPROT|TREMBL - IDMAPPING: 1024527  (['E1J38_03460', 'FG657_01705', 'SAMEA3354326_02210', 'E1814_17715', 'C0Q93_28140'])
-
-
-# === ACCESSIONS ===
-
-# IDMAPPING: 172393363  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A510L230', 'A0A2Z4RNR7'])
-# SPROT: 750902  (['Q9ZQF1', 'P41143', 'Q8KCC4', 'Q9UDC3', 'Q9BRT8'])
-# IDMAPPING & SPROT: 537235  (['Q9ZQF1', 'P41143', 'Q1RKK5', 'Q7A5M1', 'Q8KCC4'])
-# IDMAPPING | SPROT: 172607030  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A510L230', 'A0A2Z4RNR7'])
-# IDMAPPING - SPROT: 171856128  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A510L230', 'A0A2Z4RNR7'])
-# SPROT - IDMAPPING: 213667  (['Q8HZN8', 'G0K7H2', 'Q6I3A4', 'Q10856', 'Q9UDC3'])
-
-
-# IDMAPPING: 172393363  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A510L230', 'A0A2Z4RNR7'])
-# TREMBL: 163748321  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A2Z4RNR7', 'A0A3A6LW34'])
-# IDMAPPING & TREMBL: 162997917  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A2Z4RNR7', 'A0A3A6LW34'])
-# IDMAPPING | TREMBL: 173143767  (['F3EUF1', 'M4RSS4', 'A0A0A1PLJ2', 'A0A246E1H0', 'B6R536'])
-# IDMAPPING - TREMBL: 9395446  (['A0A533IJ69', 'Q8KCC4', 'A0A524EGG4', 'A0A552QAX1', 'A0A523K0N7'])
-# TREMBL - IDMAPPING: 750404  (['A0A4Q2K606', 'E9RCP6', 'A0A2A8EQS1', 'A0A2I3RFC8', 'A0A0P1M2L0'])
-
-
-# IDMAPPING: 172393363  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A510L230', 'A0A2Z4RNR7'])
-# SPROT|TREMBL: 164499223  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A2Z4RNR7', 'A0A3A6LW34'])
-# IDMAPPING & SPROT|TREMBL: 163535152  (['A0A497GIQ0', 'F3EUF1', 'M4RSS4', 'A0A2Z4RNR7', 'A0A3A6LW34'])
-# IDMAPPING | SPROT|TREMBL: 173357434  (['F3EUF1', 'M4RSS4', 'A0A0A1PLJ2', 'A0A246E1H0', 'B6R536'])
-# IDMAPPING - SPROT|TREMBL: 8858211  (['A0A533IJ69', 'A0A524EGG4', 'A0A552QAX1', 'A0A523K0N7', 'A0A552G253'])
-# SPROT|TREMBL - IDMAPPING: 964071  (['A0A4Q2K606', 'E9RCP6', 'Q9UDC3', 'A0A2A8EQS1', 'A0A2I3RFC8'])
-
-
-# === GENE-ACCESSIONS ===
-
-# IDMAPPING: 232457717  ([('AAWM_07534', 'A0A401KZ25'), ('DF011_21865', 'A0A3N7PLT7'), ('EOR16_06265', 'A0A3S3GBI9'), ('C0L86_13490', 'A0A4Q6V5F7'), ('A6V25_27470', 'A0A367Q4M5')])
-# SPROT: 1678408  ([('RPSP', 'Q4UJQ3'), ('CYSZ', 'A8ADI0'), ('DSBB', 'A5WBG4'), ('PTPN6', 'Q9QVA7'), ('EFCBP2', 'H3BTW2')])
-# IDMAPPING & SPROT: 1094323  ([('RPSP', 'Q4UJQ3'), ('ECA2492', 'Q6D4A1'), ('MS1177', 'Q65TC6'), ('TRQ2_0105', 'B1LCK9'), ('CYSZ', 'A8ADI0')])
-# IDMAPPING | SPROT: 233041802  ([('AAWM_07534', 'A0A401KZ25'), ('DF011_21865', 'A0A3N7PLT7'), ('EOR16_06265', 'A0A3S3GBI9'), ('C0L86_13490', 'A0A4Q6V5F7'), ('A6V25_27470', 'A0A367Q4M5')])
-# IDMAPPING - SPROT: 231363394  ([('AAWM_07534', 'A0A401KZ25'), ('DF011_21865', 'A0A3N7PLT7'), ('EOR16_06265', 'A0A3S3GBI9'), ('C0L86_13490', 'A0A4Q6V5F7'), ('A6V25_27470', 'A0A367Q4M5')])
-# SPROT - IDMAPPING: 584085  ([('C14ORF43', 'Q6PK13'), ('SMO', 'Q9NP51'), ('SAC', 'Q3V0F8'), ('B0882', 'P77686'), ('TOLLIP', 'Q58D12')])
-
-
-# windows
-# python -m util.idmapping.make_gene_symbol_mapping_from_idmapping --idmapping E:\idmapping\idmapping-20191105\idmapping_filtered.dat --sprot F:\uniprot\uniprot-20191015\uniprot_sprot.dat --trembl F:\uniprot\uniprot-20191015\uniprot_trembl.dat
-
-# Lines in: 2442456179
-# Lines out: 232575355
-# idmapping_filtered.dat: 232575355lines [19:15, 201349.57lines/s]
-# Genes without a sequence (109): {'EPRS1', 'TRNI', 'MT-TV', 'KARS1', 'FMR3', 'C12ORF4', 'MT-TH', 'TRNS2', 'SPG16', 'IARS1', 'MT-TE', 'TRNL2', 'DYT13', 'AARS1', 'TRNW', 'MT-TW', 'H1-4', 'TRNE', 'MT-TS2', 'SPG41', 'RNU12', 'MT-TN', 'TRNC', 'MACROH2A1', 'YARS1', 'C12ORF57', 'MKRN3-AS1', 'WHCR', 'H19-ICR', 'DYT17', 'TRNL1', 'OPA2', 'TRNF', 'MT-TF', 'SCA30', 'HARS1', 'SNORD116-1', 'SCA20', 'RARS1', 'SPG29', 'USH1H', 'IL12A-AS1', 'GINGF2', 'KIFBP', 'FRA16E', 'DISC2', 'XIST', 'DUX4L1', 'ARSL', 'SPG27', 'MIR184', 'TRNS1', 'SPG23', 'QARS1', 'TRNV', 'MARS1', 'TRNP', 'LARS1', 'ADSS1', 'SARS1', 'C11ORF95', 'DYT21', 'SPG37', 'CXORF56', 'SCA25', 'GNAS-AS1', 'MT-TL1', 'USH1K', 'SPG25', 'SPG38', 'PWRN1', 'DYT15', 'MT-TT', 'TRNT', 'C9ORF72', 'MT-TQ', 'SNORD115-1', 'MIR96', 'MT-TP', 'USH1E', 'MIR204', 'SCA32', 'MT-TS1', 'SPG14', 'RNU4ATAC', 'KCNQ1OT1', 'HYMAI', 'DARS1', 'HBB-LCR', 'SPG19', 'PWAR1', 'SPG34', 'TRNN', 'C15ORF41', 'SPG36', 'SLC7A2-IT1', 'MT-TL2', 'TRNK', 'TRNQ', 'SPG32', 'SNORD118', 'RMRP', 'GARS1', 'MT-TK', 'HELLPAR', 'IPW', 'STING1', 'SCA37', 'SPG24'}
-#  - Gene_Name (28): {'EPRS1', 'TRNI', 'SARS1', 'KARS1', 'C11ORF95', 'C12ORF4', 'CXORF56', 'IARS1', 'C15ORF41', 'AARS1', 'TRNE', 'TRNK', 'TRNQ', 'HARS1', 'RARS1', 'TRNT', 'GARS1', 'C9ORF72', 'KIFBP', 'DARS1', 'MACROH2A1', 'YARS1', 'C12ORF57', 'QARS1', 'MARS1', 'TRNP', 'LARS1', 'ADSS1'}
-#  - Gene_ORFName (0): set()
-#  - Gene_OrderedLocusName (0): set()
-#  - Gene_Synonym (22): {'EPRS1', 'SARS1', 'KARS1', 'C12ORF4', 'CXORF56', 'IARS1', 'C15ORF41', 'AARS1', 'TRNK', 'RARS1', 'LARS1', 'GARS1', 'C9ORF72', 'KIFBP', 'MACROH2A1', 'YARS1', 'C12ORF57', 'QARS1', 'MARS1', 'TRNP', 'DARS1', 'ADSS1'}
-#  - ALL (28): {'EPRS1', 'TRNI', 'SARS1', 'KARS1', 'C11ORF95', 'C12ORF4', 'CXORF56', 'IARS1', 'C15ORF41', 'AARS1', 'TRNE', 'TRNK', 'TRNQ', 'HARS1', 'RARS1', 'TRNT', 'GARS1', 'C9ORF72', 'KIFBP', 'DARS1', 'MACROH2A1', 'YARS1', 'C12ORF57', 'QARS1', 'MARS1', 'TRNP', 'LARS1', 'ADSS1'}
-# Sequences (172,393,363), Symbols: (191,778,903)
-# found_genes_seq (2,326,044), unfound_genes_seq: (1,121)
-# Genes:
-#  - Total: 4273
-# Seqs:
-#  - Total: 2326803
-#  - Max, Median, Min: 171344, 189, 1
-# Run time: 1617.49 s
-
-# {'AARS1': 23,
-#  'ADSS1': 168,
-#  'C11ORF95': 57,
-#  'C12ORF4': 63,
-#  'C12ORF57': 62,
-#  'C15ORF41': 105,
-#  'C9ORF72': 78,
-#  'CXORF56': 80,
-#  'DARS1': 15,
-#  'EPRS1': 19,
-#  'GARS1': 16,
-#  'HARS1': 11,
-#  'IARS1': 17,
-#  'KARS1': 27,
-#  'KIFBP': 21,
-#  'LARS1': 16,
-#  'MACROH2A1': 14,
-#  'MARS1': 28,
-#  'QARS1': 25,
-#  'RARS1': 19,
-#  'SARS1': 17,
-#  'TRNE': 5,
-#  'TRNI': 1,
-#  'TRNK': 212,
-#  'TRNP': 3,
-#  'TRNQ': 1,
-#  'TRNT': 2,
-#  'YARS1': 16}
-
-# {'AARS1': ['PROTEIN-CODING'],
-#  'ADSS1': ['PROTEIN-CODING'],
-#  'C11ORF95': ['PROTEIN-CODING'],
-#  'C12ORF4': ['PROTEIN-CODING'],
-#  'C12ORF57': ['PROTEIN-CODING'],
-#  'C15ORF41': ['PROTEIN-CODING'],
-#  'C9ORF72': ['PROTEIN-CODING'],
-#  'CXORF56': ['PROTEIN-CODING'],
-#  'DARS1': ['PROTEIN-CODING'],
-#  'EPRS1': ['PROTEIN-CODING'],
-#  'GARS1': ['PROTEIN-CODING'],
-#  'HARS1': ['PROTEIN-CODING'],
-#  'IARS1': ['PROTEIN-CODING'],
-#  'KARS1': ['PROTEIN-CODING'],
-#  'KIFBP': ['PROTEIN-CODING'],
-#  'LARS1': ['PROTEIN-CODING'],
-#  'MACROH2A1': ['PROTEIN-CODING'],
-#  'MARS1': ['PROTEIN-CODING'],
-#  'QARS1': ['PROTEIN-CODING'],
-#  'RARS1': ['PROTEIN-CODING'],
-#  'SARS1': ['PROTEIN-CODING'],
-#  'TRNE': ['PROTEIN-CODING', 'TRNA', 'PSEUDO'],
-#  'TRNI': ['TRNA', 'OTHER', 'RRNA', 'PSEUDO', 'PROTEIN-CODING'],
-#  'TRNK': ['PROTEIN-CODING', 'TRNA', 'OTHER'],
-#  'TRNP': ['PROTEIN-CODING', 'TRNA', 'PSEUDO'],
-#  'TRNQ': ['PROTEIN-CODING', 'TRNA'],
-#  'TRNT': ['TRNA', 'OTHER', 'PSEUDO'],
-#  'YARS1': ['PROTEIN-CODING']}
-
-#  'ARSL': ['PROTEIN-CODING'],
-#  'DISC2': ['NCRNA'],
-#  'DUX4L1': ['PSEUDO'],
-#  'DYT13': ['UNKNOWN'],
-#  'DYT15': ['UNKNOWN'],
-#  'DYT17': ['PROTEIN-CODING', 'UNKNOWN'],
-#  'DYT21': ['UNKNOWN'],
-#  'FRA16E': ['OTHER'],
-#  'GINGF2': ['UNKNOWN'],
-#  'GNAS-AS1': ['NCRNA'],
-#  'H1-4': ['PROTEIN-CODING'],
-#  'H19-ICR': ['BIOLOGICAL-REGION'],
-#  'HBB-LCR': ['BIOLOGICAL-REGION'],
-#  'HELLPAR': ['NCRNA'],
-#  'HYMAI': ['NCRNA'],
-#  'IL12A-AS1': ['NCRNA'],
-#  'IPW': ['NCRNA'],
-#  'KCNQ1OT1': ['NCRNA'],
-#  'MIR184': ['NCRNA'],
-#  'MIR204': ['NCRNA'],
-#  'MIR96': ['NCRNA'],
-#  'MKRN3-AS1': ['NCRNA'],
-#  'MT-TE': ['TRNA'],
-#  'MT-TF': ['TRNA'],
-#  'MT-TH': ['TRNA'],
-#  'MT-TK': ['PROTEIN-CODING', 'TRNA'],
-#  'MT-TL1': ['TRNA'],
-#  'MT-TL2': ['TRNA'],
-#  'MT-TN': ['TRNA'],
-#  'MT-TP': ['TRNA'],
-#  'MT-TQ': ['TRNA'],
-#  'MT-TS1': ['TRNA'],
-#  'MT-TS2': ['TRNA'],
-#  'MT-TT': ['TRNA'],
-#  'MT-TV': ['TRNA'],
-#  'MT-TW': ['TRNA'],
-#  'OPA2': ['UNKNOWN'],
-#  'PWAR1': ['NCRNA'],
-#  'PWRN1': ['NCRNA'],
-#  'RMRP': ['NCRNA'],
-#  'RNU12': ['SNRNA', 'PSEUDO'],
-#  'RNU4ATAC': ['SNRNA'],
-#  'SCA20': ['UNKNOWN'],
-#  'SCA25': ['UNKNOWN'],
-#  'SCA30': ['UNKNOWN'],
-#  'SCA37': ['PROTEIN-CODING', 'UNKNOWN'],
-#  'SNORD115-1': ['SNORNA'],
-#  'SNORD116-1': ['SNORNA'],
-#  'SNORD118': ['SNORNA'],
-#  'SPG14': ['UNKNOWN'],
-#  'SPG16': ['UNKNOWN'],
-#  'SPG19': ['UNKNOWN'],
-#  'SPG23': ['PROTEIN-CODING'],
-#  'SPG24': ['UNKNOWN'],
-#  'SPG25': ['UNKNOWN'],
-#  'SPG27': ['UNKNOWN'],
-#  'SPG29': ['UNKNOWN'],
-#  'SPG32': ['UNKNOWN'],
-#  'SPG34': ['UNKNOWN'],
-#  'SPG36': ['UNKNOWN'],
-#  'SPG37': ['UNKNOWN'],
-#  'SPG38': ['UNKNOWN'],
-#  'SPG41': ['UNKNOWN'],
-#  'STING1': ['PROTEIN-CODING'],
-#  'TRNF': ['NCRNA', 'TRNA', 'PSEUDO'],
-#  'TRNL1': ['TRNA'],
-#  'TRNL2': ['TRNA'],
-#  'TRNN': ['TRNA', 'PSEUDO'],
-#  'TRNS1': ['TRNA'],
-#  'TRNS2': ['TRNA'],
-#  'TRNW': ['TRNA', 'PSEUDO'],
-#  'USH1E': ['UNKNOWN'],
-#  'USH1H': ['UNKNOWN'],
-#  'USH1K': ['UNKNOWN'],
-#  'WHCR': ['OTHER'],
-#  'XIST': ['NCRNA', 'OTHER'],
+# Run time: 2224.97 s
