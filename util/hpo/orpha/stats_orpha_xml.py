@@ -5,6 +5,7 @@ import gzip
 import errno
 import argparse
 from glob import glob
+from io import StringIO
 from pathlib import Path
 from collections import defaultdict
 from collections import namedtuple
@@ -167,40 +168,57 @@ def parse_orpha_gene_xml(xml6_path):
 #       </HPODisorderAssociationList>
 #     </Disorder>
 
+bugged = {
+    "HP:000",
+    "1347",
+    "HP:0007",
+    "034",
+    "MESH:D004827",
+    "HP:00011",
+    "56",
+    "HP:000438",
+    "3",
+}
+
 
 class Orpha4Collector:
     def __init__(self):
         self.tag = None
         self.orpha_phenotype = {}
         self.disorder = None
+        self.data_str = ''
 
     def start(self, tag, attr):
         self.tag = tag
+        self.data_str = ''
         if tag == 'Disorder':
             self.disorder = None
         elif tag == 'JDBOR':
             self.orpha_phenotype = {}
             self.disorder = None
 
-    def end(self, tag):
-        pass
+    def end(self, tag):  # Called for each closing tag.
+        # if self.data_str in bugged:
+        #     print(f'==DEBUG: {(self.disorder, self.data_str)}')
+        if tag == 'OrphaNumber' and self.disorder is None:
+            self.disorder = self.data_str
+            self.orpha_phenotype[self.disorder] = set()
+        elif tag == 'HPOId':
+            self.orpha_phenotype[self.disorder].add(self.data_str)
 
     def data(self, data):
         data = data.strip()
         if not data:
             return
-        if self.tag == 'OrphaNumber' and self.disorder is None:
-            self.disorder = data
-            self.orpha_phenotype[self.disorder] = set()
-        elif self.tag == 'HPOId':
-            self.orpha_phenotype[self.disorder].add(data)
+        self.data_str += data
 
-    def close(self):
+    def close(self):  # Called when all data has been parsed.
         return self.orpha_phenotype
 
 
 def parse_orpha_phenotype_xml(xml4_path):
-    with xml4_path.open(encoding='ISO-8859-1') as stream:
+    # # line buffering
+    with xml4_path.open(mode='r', buffering=1, encoding='ISO-8859-1') as stream:
         # stream=xml4_path.open(encoding='ISO-8859-1')
         collector = Orpha4Collector()
         parser = ET.XMLParser(target=collector)
@@ -281,7 +299,7 @@ def print_set_stats(n1, s1, n2, s2, unit=''):
     )
 
 
-if __name__ =='__main__':
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Print some statistics of the orpha en_product6.xml file.'
     )

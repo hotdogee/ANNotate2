@@ -199,7 +199,7 @@ def parse_decipher_ddg2p(path):
             if not phenotypes:
                 continue
             decipher_gene_phenotype[gene_symbol] |= set(
-                [h.strip() for h in phenotypes.split(';')]
+                [h.strip() for h in phenotypes.split(';') if h[:4] != 'MESH']
             )
     return decipher_gene_phenotype
 
@@ -287,7 +287,19 @@ def index_uniprot_fa(path, gene_seq, whitelist):
     return
 
 
-if __name__ =='__main__':
+bugged = {
+    "HP:000",
+    "1347",
+    "HP:0007",
+    "034",
+    "MESH:D004827",
+    "HP:00011",
+    "56",
+    "HP:000438",
+    "3",
+}
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=
         'Print some statistics of the HPO phenotype.hpoa and orpha en_product6.xml file.'
@@ -359,6 +371,9 @@ if __name__ =='__main__':
     print('==HPO: {hpoa_path.name}==')
     # Disorders: 11372
     print(f'Disorders: {len(hpo_disorder_phenotype)}')
+    print(
+        f'==DEBUG bugged: {[p for d in hpo_disorder_phenotype for p in hpo_disorder_phenotype[d] if p in bugged]}'
+    )
 
     print('')
     print('==ORPHA_GENE: {orpha6_path.name}==')
@@ -379,6 +394,9 @@ if __name__ =='__main__':
     print('==ORPHA_HPO: {orpha4_path.name}==')
     orpha_phenotype = parse_orpha_phenotype_xml(orpha4_path)
     print(f'Disorders: {len(orpha_phenotype)}')
+    # print(
+    #     f'==DEBUG bugged: {set([(d, p) for d in orpha_phenotype for p in orpha_phenotype[d] if len(p) != 10])}'
+    # )
     # build gene_phenotype from orpha_phenotype and orpha_gene
     orpha_gene_phenotype = defaultdict(set)
     for orpha in orpha_gene:
@@ -420,6 +438,10 @@ if __name__ =='__main__':
     print('==DECIPHER==')
     decipher_gene_phenotype = parse_decipher_ddg2p(ddg2p_path)
     print(f'Genes: {len(decipher_gene_phenotype)}')  # 1370
+    # print(
+    #     f'==DEBUG bugged: {set([(d, p) for d in decipher_gene_phenotype for p in decipher_gene_phenotype[d] if len(p) != 10])}'
+    # )
+    # ==DEBUG bugged: {('CFAP300', 'MESH:D012857'), ('RHOBTB2', 'MESH:D004827'), ('NAA15', 'MESH:D001321'), ('SEPSECS', 'MESH:D002524'), ('NBEA', 'MESH:D004827'), ('DSTYK', 'MESH:D020336'), ('NR2F2', 'MESH:D058531'), ('MRPS2', 'MESH:D006319'), ('KIAA1109', 'MESH:D001176'), ('FARS2', 'MESH:D004831'), ('EXTL3', 'MESH:C565469'), ('SPTBN2', 'MESH:C535523'), ('NAXD', 'MESH:D006333'), ('KCNT2', 'MESH:D004827'), ('CACNA1E', 'MESH:D001176'), ('RHOBTB2', 'MESH:D009069'), ('EXOSC9', 'MESH:D050723')}
 
     hpo_omim_gene_phenotype_set = set(
         [
@@ -492,7 +514,7 @@ if __name__ =='__main__':
 
 # windows
 
-# python -m util.hpo.make_gene_phenotype --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --orpha6 E:\hpo\orpha-20191101\en_product6.xml --orpha4 E:\hpo\orpha-20191101\en_product4_HPO.xml --hpog2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv --omim_morbidmap E:\hpo\omim-20191101\morbidmap.txt --out E:\hpo\hpo-20191011\hpo-20191011-gene-phenotype.json
+# python -m util.hpo.make_gene_phenotype --hpoa E:\hpo\hpo-20191011\phenotype.hpoa --orpha6 E:\hpo\orpha-20191101\en_product6.xml --orpha4 E:\hpo\orpha-20191101\en_product4_HPO.xml --hpog2p E:\hpo\hpo-20191011\annotation\ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt --ddg2p E:\hpo\decipher-20191101\DDG2P_1_11_2019.csv --omim_morbidmap E:\hpo\omim-20191101\morbidmap.txt --out E:\hpo\hpo-20191011\hpo-20191011-gene-phenotype-2.json
 
 # Processing: phenotype.hpoa, en_product6.xml, en_product4_HPO.xml, ALL_SOURCES_ALL_FREQUENCIES_genes_to_phenotype.txt, morbidmap.txt, DDG2P_1_11_2019.csv
 # ==HPO: {hpoa_path.name}==
@@ -525,7 +547,6 @@ if __name__ =='__main__':
 # HPO_OMIM - HPO_G2P: 216867  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('CORTRD2', 'HP:0000956'), ('RCHTS', 'HP:0002119'), ('FRODO', 'HP:0000136')])
 # HPO_G2P - HPO_OMIM: 84013  ([('GPC3', 'HP:0000303'), ('NSD2', 'HP:0000384'), ('RNF168', 'HP:0006530'), ('XRCC2', 'HP:0012041'), ('MUSK', 'HP:0031108')])
 
-
 # HPO_OMIM|HPO_G2P: 377870  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('NFE2L2', 'HP:0002721'), ('MRT60', 'HP:0000007'), ('NSD2', 'HP:0000384')])
 # ORPHA: 109591  ([('GPC3', 'HP:0000303'), ('WHRN', 'HP:0000359'), ('RNF168', 'HP:0006530'), ('XRCC2', 'HP:0012041'), ('MUSK', 'HP:0031108')])
 # HPO_OMIM|HPO_G2P & ORPHA: 96190  ([('GPC3', 'HP:0000303'), ('RNF168', 'HP:0006530'), ('XRCC2', 'HP:0012041'), ('MUSK', 'HP:0031108'), ('KCNJ5', 'HP:0200114')])
@@ -533,14 +554,12 @@ if __name__ =='__main__':
 # HPO_OMIM|HPO_G2P - ORPHA: 281680  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('NFE2L2', 'HP:0002721'), ('CORTRD2', 'HP:0000956'), ('RCHTS', 'HP:0002119')])
 # ORPHA - HPO_OMIM|HPO_G2P: 13401  ([('WHRN', 'HP:0000359'), ('CACNA1B', 'HP:0001290'), ('KIAA0753', 'HP:0001252'), ('TRPM4', 'HP:0012722'), ('NHLRC1', 'HP:0007359')])
 
-
 # HPO_OMIM|HPO_G2P|ORPHA: 391271  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('NFE2L2', 'HP:0002721'), ('MRT60', 'HP:0000007'), ('NSD2', 'HP:0000384')])
 # HPO_ORPHA: 111511  ([('GPC3', 'HP:0000303'), ('WHRN', 'HP:0000359'), ('RNF168', 'HP:0006530'), ('XRCC2', 'HP:0012041'), ('MUSK', 'HP:0031108')])
 # HPO_OMIM|HPO_G2P|ORPHA & HPO_ORPHA: 109688  ([('GPC3', 'HP:0000303'), ('WHRN', 'HP:0000359'), ('RNF168', 'HP:0006530'), ('XRCC2', 'HP:0012041'), ('MUSK', 'HP:0031108')])
 # HPO_OMIM|HPO_G2P|ORPHA | HPO_ORPHA: 393094  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('NFE2L2', 'HP:0002721'), ('MRT60', 'HP:0000007'), ('NSD2', 'HP:0000384')])
 # HPO_OMIM|HPO_G2P|ORPHA - HPO_ORPHA: 281583  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('NFE2L2', 'HP:0002721'), ('CORTRD2', 'HP:0000956'), ('RCHTS', 'HP:0002119')])
 # HPO_ORPHA - HPO_OMIM|HPO_G2P|ORPHA: 1823  ([('NUP133', 'HP:0001419'), ('PCARE', 'HP:0000006'), ('FGG', 'HP:0000006'), ('MKS1', 'HP:0010983'), ('RIMS1', 'HP:0001419')])
-
 
 # HPO_OMIM|HPO_G2P|ORPHA|HPO_ORPHA: 393094  ([('MTDPS2', 'HP:0003690'), ('FJHN', 'HP:0005584'), ('NFE2L2', 'HP:0002721'), ('MRT60', 'HP:0000007'), ('NSD2', 'HP:0000384')])
 # DECIPHER: 28710  ([('LRPPRC', 'HP:0001250'), ('FKRP', 'HP:0001249'), ('KCNJ10', 'HP:0000007'), ('GRIN2A', 'HP:0000006'), ('MTHFR', 'HP:0000252')])
